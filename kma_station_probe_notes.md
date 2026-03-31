@@ -105,7 +105,9 @@ Successfully downloaded:
 
 - `25to1/scripts/download_kma_station_fileset.py`
 - `25to1/scripts/normalize_kma_daily_station_csv.py`
+- `25to1/scripts/build_kma_station_metadata.py`
+- `25to1/scripts/build_stage1_station_collocations.py`
 
 ## Next step
 
-Use the normalized UTF-8 station tables as the target-side bootstrap data source for Stage-1 label modeling.
+Use the normalized UTF-8 station tables plus the collocated January 2018 grid samples as the target-side bootstrap data source for Stage-1 label modeling.

@@ -226,3 +226,51 @@ Added scripts:
 
 - `25to1/scripts/download_kma_station_fileset.py`
 - `25to1/scripts/normalize_kma_daily_station_csv.py`
+
+## Update 2026-03-31: station metadata + collocations added
+
+Built station metadata from KMA detail pages:
+
+- `25to1/data/stage1/processed/stations/station_metadata_bootstrap.csv`
+- `25to1/data/stage1/processed/stations/station_metadata_bootstrap.json`
+
+Bootstrap station metadata:
+
+- ASOS `100`: lat `37.67713`, lon `128.71834`, elev `772.43 m`
+- AWS `116`: lat `37.44526`, lon `126.96402`, elev `624.82 m`
+
+Built January 2018 station-to-grid collocations:
+
+- `25to1/data/stage1/processed/station_collocations/stage1_station_collocations_2018_01.csv`
+- `25to1/data/stage1/processed/station_collocations/stage1_station_collocations_2018_01_summary.json`
+
+Collocation summary:
+
+- rows: `62`
+- sources: `asos`, `aws`
+- station count: `2`
+- date range: `2018-01-01` to `2018-01-31`
+
+Each collocation row currently includes:
+
+- station target fields such as `station_avg_temp_c`, `station_min_temp_c`, `station_max_temp_c`
+- station-side daily variables such as precipitation, wind, humidity, pressure, solar where available
+- colocated grid features from the Stage-1 simplified stacks such as:
+  - `era5_t2m_c`
+  - `dem_m`
+  - `slope_deg`
+  - `aspect_deg`
+  - `imp_proxy`
+  - `lc_type1_majority`
+  - `lst_day_c`
+  - `lst_night_c`
+  - `lst_mean_c`
+  - `ndvi`
+  - `solar_incoming_j_m2_day`
+  - `solar_incoming_w_m2`
+  - validity / QC fields
+
+Added scripts:
+
+- `25to1/scripts/build_kma_station_metadata.py`
+- `25to1/scripts/build_stage1_station_collocations.py`
