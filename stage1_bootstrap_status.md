@@ -22,26 +22,30 @@
 - 其余是 `2018-01` 的日尺度 `3 tiles/day`
 - 已生成 `31` 个完整日的拼接输出
 - 日拼接输出目录: `25to1/data/stage1/interim/mod11a1_daily`
-- 每天包含:
-  - `*_lst_day_c.tif`
-  - `*_lst_night_c.tif`
-  - `*_qc_day.tif`
-  - `*_qc_night.tif`
+
+每天包含:
+
+- `*_lst_day_c.tif`
+- `*_lst_night_c.tif`
+- `*_qc_day.tif`
+- `*_qc_night.tif`
 
 ### 2. MCD12Q1
 
 - 时间范围: `2018`
 - granule 数: `3`
 - 本地目录: `25to1/data/stage1/raw/mcd12q1`
-- 已生成静态土地覆盖产物:
-  - `25to1/data/stage1/processed/mcd12q1_lc_type1_korea_500m.tif`
-  - `25to1/data/stage1/processed/mcd12q1_lc_type1_majority_korea_1km.tif`
-  - `25to1/data/stage1/processed/mcd12q1_imp_proxy_korea_1km.tif`
+
+已生成静态土地覆盖产物:
+
+- `25to1/data/stage1/processed/mcd12q1_lc_type1_korea_500m.tif`
+- `25to1/data/stage1/processed/mcd12q1_lc_type1_majority_korea_1km.tif`
+- `25to1/data/stage1/processed/mcd12q1_imp_proxy_korea_1km.tif`
 
 说明:
 
 - `imp_proxy` 是依据 `LC_Type1` 中 `Urban and Built-up Lands = 13` 聚合得到的 `1 km` 城市建成区比例代理
-- 这一步是合理复现近似，但不是论文作者公开说明过的精确 `Imp` 构造公式
+- 这是合理复现近似，但不是论文作者公开说明过的精确 `Imp` 构造公式
 
 ### 3. ERA5 daily mean T2M
 
@@ -73,18 +77,42 @@ ERA5 文件检查:
 - 清单文件: `25to1/data/stage1/interim/srtm_korea_preview.json`
 - 原始目录: `25to1/data/stage1/raw/srtm`
 - 解压目录: `25to1/data/stage1/raw/srtm/unpacked`
-- 韩国范围 DEM mosaic:
-  - `25to1/data/stage1/processed/srtm_dem_korea_wgs84.tif`
-  - CRS: `EPSG:4326`
-  - 尺寸: `25200 x 23400`
-  - 边界约: `124.50E-131.50E, 33.00N-39.50N`
-- 已派生地形因子:
-  - `25to1/data/stage1/processed/srtm_slope_korea_wgs84.tif`
-  - `25to1/data/stage1/processed/srtm_aspect_korea_wgs84.tif`
-  - slope 范围约: `0.0° ~ 89.9°`
-  - aspect 范围约: `0.0° ~ 359.4°`
 
-### 5. python312 环境
+韩国范围 DEM 产物:
+
+- `25to1/data/stage1/processed/srtm_dem_korea_wgs84.tif`
+- `25to1/data/stage1/processed/srtm_slope_korea_wgs84.tif`
+- `25to1/data/stage1/processed/srtm_aspect_korea_wgs84.tif`
+
+说明:
+
+- DEM CRS: `EPSG:4326`
+- DEM 尺寸: `25200 x 23400`
+- DEM 边界约: `124.50E-131.50E, 33.00N-39.50N`
+- slope 范围约: `0.0° ~ 89.9°`
+- aspect 范围约: `0.0° ~ 359.4°`
+
+### 5. NDVI
+
+- 采用产品: `MOD13A2 v061` 1 km 16-day NDVI
+- 说明: 这是当前阶段为论文 NDVI 变量采用的合理近似方案，当前论文可见内容没有明确写出具体 MODIS NDVI 产品号
+- 已下载时间片:
+  - `A2018001`
+  - `A2018017`
+- 原始目录: `25to1/data/stage1/raw/ndvi`
+
+已生成 NDVI composite:
+
+- `25to1/data/stage1/processed/ndvi_composites/A2018001_ndvi.tif`
+- `25to1/data/stage1/processed/ndvi_composites/A2018017_ndvi.tif`
+- manifest: `25to1/data/stage1/processed/ndvi_composites/manifest.json`
+
+补充:
+
+- 已成功并入 `31` 天的简化版 `npz` 特征栈
+- `npz` 新增字段: `ndvi`
+
+### 6. python312 环境
 
 当前已确认可用:
 
@@ -96,30 +124,20 @@ ERA5 文件检查:
 - `rasterio`
 - `pyhdf`
 
-说明:
+已新增/可用脚本:
 
-- `MOD11A1` 目前已可通过 `pyhdf` 读取
-- `MOD11A1` 批量拼接脚本:
-  - `25to1/scripts/build_mod11a1_daily_mosaics.py`
-- `SRTM` 派生脚本:
-  - `25to1/scripts/derive_srtm_slope_aspect.py`
-- `MCD12Q1` 静态因子脚本:
-  - `25to1/scripts/build_mcd12q1_static_features.py`
-- 简化版特征栈脚本:
-  - `25to1/scripts/build_stage1_simplified_feature_stacks.py`
-- 样本文件 `MOD11A1.A2018001.h28v05...hdf` 检查结果:
-  - `LST_Day_1km` 形状 `1200 x 1200`
-  - 有效像元 `182,075`
-  - 白天地表温度约 `-25.87°C ~ 15.15°C`
+- `25to1/scripts/build_mod11a1_daily_mosaics.py`
+- `25to1/scripts/derive_srtm_slope_aspect.py`
+- `25to1/scripts/build_mcd12q1_static_features.py`
+- `25to1/scripts/build_mod13a2_ndvi_composites.py`
+- `25to1/scripts/augment_stage1_features_with_ndvi.py`
+- `25to1/scripts/build_stage1_simplified_feature_stacks.py`
 
-### 6. 简化版一阶段特征栈
+### 7. 简化版一阶段特征栈
 
-- 目录:
-  - `25to1/data/stage1/processed/stage1_simplified_features`
-- 已生成天数:
-  - `31`
-- manifest:
-  - `25to1/data/stage1/processed/stage1_simplified_features/manifest.json`
+- 目录: `25to1/data/stage1/processed/stage1_simplified_features`
+- 已生成天数: `31`
+- manifest: `25to1/data/stage1/processed/stage1_simplified_features/manifest.json`
 
 每个 `npz` 目前包含:
 
@@ -128,6 +146,7 @@ ERA5 文件检查:
 - `slope_deg`
 - `aspect_deg`
 - `imp_proxy`
+- `ndvi`
 - `lc_type1_majority`
 - `lst_day_c`
 - `lst_night_c`
@@ -144,15 +163,15 @@ ERA5 文件检查:
 - 这里的 `lst_mean_c` 只是 `day/night` 的近似平均，不等于论文中的 `MODIS-derived air temperature`
 - 它适合下一步快速验证数据管线和模型输入接口
 
-## 还没开始下载的数据
+## 还没开始下载或构造的数据
 
 - `AWS / ASOS` 站点数据
-- `NDVI`
 - `incoming solar radiation`
 
 ## 当前最适合继续做的事情
 
-1. 补 `NDVI`
-2. 补 `incoming solar radiation`
-3. 引入站点数据，拟合真正的 `MODIS-derived air temperature`
-4. 再扩展到 `2018` 全年甚至 `2000-2020`
+1. 补 `incoming solar radiation`
+2. 引入站点数据，拟合真正的 `MODIS-derived air temperature`
+3. 再扩展到 `2018` 全年甚至 `2000-2020`
+4. 开始搭一个简化版 Stage 1 baseline 模型验证数据接口
+
