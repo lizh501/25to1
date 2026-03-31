@@ -175,3 +175,19 @@ ERA5 文件检查:
 3. 再扩展到 `2018` 全年甚至 `2000-2020`
 4. 开始搭一个简化版 Stage 1 baseline 模型验证数据接口
 
+## Update 2026-03-31: incoming solar radiation added
+
+- Source chosen for current approximation: ERA5 daily statistics `surface_solar_radiation_downwards` (`ssrd`)
+- Raw NetCDF: `25to1/data/stage1/raw/solar_radiation/era5_daily_ssrd_2018_01.nc`
+- Verified variables: `latitude`, `longitude`, `number`, `ssrd`, `valid_time`
+- NetCDF `ssrd` metadata:
+  - units: `J m**-2`
+  - long_name: `Surface short-wave (solar) radiation downwards`
+- Added script: `25to1/scripts/augment_stage1_features_with_solar_radiation.py`
+- Updated script: `25to1/scripts/download_era5_daily.py`
+- Updated `31` standard daily feature stacks with:
+  - `solar_incoming_j_m2_day`
+  - `solar_incoming_w_m2`
+- Verification:
+  - `A2018001.npz` solar mean: `10050044.0 J/m2/day`, `116.32 W/m2`
+  - `A2018031.npz` solar mean: `9827590.0 J/m2/day`, `113.75 W/m2`

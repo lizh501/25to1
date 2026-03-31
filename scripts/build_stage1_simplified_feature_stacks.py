@@ -1,5 +1,6 @@
 import argparse
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from rasterio.warp import Resampling, reproject
 
 
 WGS84 = CRS.from_epsg(4326)
+DAY_NPZ_RE = re.compile(r"^A\d{7}\.npz$")
 
 
 def parse_modis_day(day_code: str) -> datetime:
@@ -110,6 +112,8 @@ def save_npz(path: Path, **arrays) -> None:
 def rebuild_manifest(output_dir: Path) -> list[dict]:
     manifest = []
     for npz_path in sorted(output_dir.glob("A*.npz")):
+        if not DAY_NPZ_RE.match(npz_path.name):
+            continue
         day = npz_path.stem
         day_date = parse_modis_day(day).date()
         data = np.load(npz_path)

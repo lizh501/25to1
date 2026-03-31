@@ -1,11 +1,15 @@
 import argparse
 import json
+import re
 from datetime import datetime, date
 from pathlib import Path
 
 import numpy as np
 import rasterio
 from rasterio.warp import Resampling, reproject
+
+
+DAY_NPZ_RE = re.compile(r"^A\d{7}\.npz$")
 
 
 def reproject_to_target(
@@ -76,6 +80,10 @@ def main() -> None:
 
     updated = 0
     for npz_path in sorted(features_dir.glob("A*.npz")):
+        if not DAY_NPZ_RE.match(npz_path.name):
+            print(f"SKIP {npz_path.name}: non-standard filename")
+            continue
+
         day = npz_path.stem
         day_date = modis_day_to_date(day)
         ndvi_entry = find_ndvi_entry(ndvi_entries, day_date)

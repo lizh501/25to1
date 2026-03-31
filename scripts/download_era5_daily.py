@@ -4,16 +4,38 @@ from pathlib import Path
 from stage1_common import load_env_file, load_json
 
 
-def build_request(cfg: dict, year: int, months: list[int] | None = None) -> dict:
+VARIABLE_DEFAULTS = {
+    "2m_temperature": {
+        "output_dir_key": "era5_daily",
+        "output_stem": "era5_daily_t2m",
+        "daily_statistic": "daily_mean",
+        "label": "ERA5 daily mean T2M",
+    },
+    "surface_solar_radiation_downwards": {
+        "output_dir_key": "solar_radiation",
+        "output_stem": "era5_daily_ssrd",
+        "daily_statistic": "daily_sum",
+        "label": "ERA5 daily sum SSRD",
+    },
+}
+
+
+def build_request(
+    cfg: dict,
+    year: int,
+    variable: str,
+    daily_statistic: str,
+    months: list[int] | None = None,
+) -> dict:
     bbox = cfg["region"]["bbox_wgs84"]
     month_values = months or list(range(1, 13))
     return {
         "product_type": "reanalysis",
-        "variable": ["2m_temperature"],
+        "variable": [variable],
         "year": [f"{year:04d}"],
         "month": [f"{month:02d}" for month in month_values],
         "day": [f"{day:02d}" for day in range(1, 32)],
-        "daily_statistic": "daily_mean",
+        "daily_statistic": daily_statistic,
         "time_zone": "utc+00:00",
         "frequency": "1_hourly",
         "area": [bbox[3], bbox[0], bbox[1], bbox[2]],
@@ -44,6 +66,21 @@ def main() -> None:
         default="",
         help="Optional explicit output path. Defaults to the stage1 raw era5 directory.",
     )
+    parser.add_argument(
+        "--variable",
+        default="2m_temperature",
+        help="ERA5 variable name, e.g. 2m_temperature or surface_solar_radiation_downwards.",
+    )
+    parser.add_argument(
+        "--daily-statistic",
+        default="",
+        help="Optional CDS daily statistic. Defaults are chosen per variable.",
+    )
+    parser.add_argument(
+        "--output-stem",
+        default="",
+        help="Optional output filename stem without year/month suffix.",
+    )
     args = parser.parse_args()
 
     config_path = Path(args.config).resolve()
@@ -59,20 +96,34 @@ def main() -> None:
         return
 
     months = [int(item) for item in args.months.split(",") if item.strip()] if args.months else None
+    defaults = VARIABLE_DEFAULTS.get(args.variable, {})
+    daily_statistic = args.daily_statistic or defaults.get("daily_statistic", "daily_mean")
+    output_dir_key = defaults.get("output_dir_key", "era5_daily")
+    output_stem = args.output_stem or defaults.get(
+        "output_stem",
+        f"era5_daily_{args.variable.replace('-', '_')}",
+    )
+    label = defaults.get("label", f"ERA5 {daily_statistic} {args.variable}")
     output_path = Path(args.output).resolve() if args.output else None
     if output_path is None:
         workspace_root = config_path.parents[2]
         suffix = f"_{args.months.replace(',', '-')}" if args.months else ""
         output_path = (
             workspace_root
-            / cfg["paths"]["era5_daily"]
-            / f"era5_daily_t2m_{args.year:04d}{suffix}.nc"
+            / cfg["paths"][output_dir_key]
+            / f"{output_stem}_{args.year:04d}{suffix}.nc"
         )
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    request = build_request(cfg, args.year, months=months)
+    request = build_request(
+        cfg,
+        args.year,
+        variable=args.variable,
+        daily_statistic=daily_statistic,
+        months=months,
+    )
     period_label = f"{args.year}-{args.months}" if args.months else f"{args.year}"
-    print(f"Downloading ERA5 daily mean T2M for {period_label} -> {output_path}")
+    print(f"Downloading {label} for {period_label} -> {output_path}")
 
     client = cdsapi.Client()
     client.retrieve(
