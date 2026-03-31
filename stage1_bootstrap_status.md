@@ -33,6 +33,15 @@
 - 时间范围: `2018`
 - granule 数: `3`
 - 本地目录: `25to1/data/stage1/raw/mcd12q1`
+- 已生成静态土地覆盖产物:
+  - `25to1/data/stage1/processed/mcd12q1_lc_type1_korea_500m.tif`
+  - `25to1/data/stage1/processed/mcd12q1_lc_type1_majority_korea_1km.tif`
+  - `25to1/data/stage1/processed/mcd12q1_imp_proxy_korea_1km.tif`
+
+说明:
+
+- `imp_proxy` 是依据 `LC_Type1` 中 `Urban and Built-up Lands = 13` 聚合得到的 `1 km` 城市建成区比例代理
+- 这一步是合理复现近似，但不是论文作者公开说明过的精确 `Imp` 构造公式
 
 ### 3. ERA5 daily mean T2M
 
@@ -106,7 +115,7 @@ ERA5 文件检查:
 
 ## 当前最适合继续做的事情
 
-1. 把 `MCD12Q1` 转成论文所需的 `Imp` 或静态土地覆盖因子
-2. 补 `NDVI`
-3. 补 `incoming solar radiation`
+1. 补 `NDVI`
+2. 补 `incoming solar radiation`
+3. 用 `MOD11A1 + ERA5 + DEM/aspect + imp_proxy` 先搭一个简化版标签生成流水线
 4. 再扩展到 `2018` 全年甚至 `2000-2020`
