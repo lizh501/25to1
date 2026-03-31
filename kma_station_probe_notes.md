@@ -57,23 +57,55 @@ From the `fnRltmFileSetDownload()` JS flow:
 - `startMt`
 - `endMt`
 
-## Current blocker
+## Confirmed download flow
 
-The remaining gap is not the landing page or the login endpoint itself. The hard part is the sessioned popup-to-download chain:
+The day-fileset download chain is now confirmed working.
 
-1. create an authenticated session
-2. reproduce the request-purpose selection
-3. capture the final download endpoint and exact payload
-
-The KMA portal was reachable, but repeated reads of some linked JS assets were unstable from this environment, so the final request was not fully reconstructed yet.
-
-## Practical next step
-
-Resume from this note and script a `requests.Session(trust_env=False)` flow:
+Working flow:
 
 1. `GET /cmmn/commonLoginLayer.do`
 2. `POST /login/loginAjax.do`
 3. `POST /cmmn/loginSessionCheck.do`
-4. `POST /data/cmmn/selectPrposRltmFileSetReqstPopup.do`
-5. inspect the returned popup HTML for `reqstPurposeCd`
-6. trace the final file download POST
+4. browse `selectAsosRltmList.do` or `selectAwsRltmList.do`
+5. choose a `fileSizeMgList` entry
+6. `POST /data/common/selectPrposPopup.do`
+7. choose `reqstPurposeCd`
+8. `POST /data/common/processDtsReqst.do`
+
+## Confirmed purpose code for this project
+
+- `F00408` = `학술/연구` = academic / research
+
+## Confirmed returned file structure
+
+The KMA response is a nested package:
+
+1. outer application zip returned by `processDtsReqst.do`
+2. inner data zip with the requested file name
+3. final `CSV` inside the inner zip
+
+CSV encoding:
+
+- `cp949`
+
+## Confirmed bootstrap downloads
+
+Successfully downloaded:
+
+- `ASOS day 2018`
+  - outer zip: `25to1/data/stage1/raw/stations/SURFACE_ASOS_100_DAY_2018_2018_2019.zip`
+  - extracted dir: `25to1/data/stage1/raw/stations/asos_2018`
+  - final csv: `25to1/data/stage1/raw/stations/asos_2018/SURFACE_ASOS_100_DAY_2018_2018_2019.csv`
+- `AWS day 2018`
+  - outer zip: `25to1/data/stage1/raw/stations/SURFACE_AWS_116_DAY_2018_2018_2019.zip`
+  - extracted dir: `25to1/data/stage1/raw/stations/aws_2018`
+  - final csv: `25to1/data/stage1/raw/stations/aws_2018/SURFACE_AWS_116_DAY_2018_2018_2019.csv`
+
+## Implemented local scripts
+
+- `25to1/scripts/download_kma_station_fileset.py`
+- `25to1/scripts/normalize_kma_daily_station_csv.py`
+
+## Next step
+
+Use the normalized UTF-8 station tables as the target-side bootstrap data source for Stage-1 label modeling.

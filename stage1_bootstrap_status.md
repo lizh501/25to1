@@ -191,3 +191,38 @@ ERA5 文件检查:
 - Verification:
   - `A2018001.npz` solar mean: `10050044.0 J/m2/day`, `116.32 W/m2`
   - `A2018031.npz` solar mean: `9827590.0 J/m2/day`, `113.75 W/m2`
+
+## Update 2026-03-31: KMA station data bootstrap added
+
+- KMA login and day-fileset download flow confirmed working
+- Confirmed usage purpose code for this project:
+  - `F00408` = academic / research
+- Returned file structure confirmed as:
+  - outer application zip
+  - inner data zip
+  - final `cp949` CSV
+
+Downloaded station files:
+
+- ASOS day 2018:
+  - outer zip: `25to1/data/stage1/raw/stations/SURFACE_ASOS_100_DAY_2018_2018_2019.zip`
+  - extracted csv: `25to1/data/stage1/raw/stations/asos_2018/SURFACE_ASOS_100_DAY_2018_2018_2019.csv`
+- AWS day 2018:
+  - outer zip: `25to1/data/stage1/raw/stations/SURFACE_AWS_116_DAY_2018_2018_2019.zip`
+  - extracted csv: `25to1/data/stage1/raw/stations/aws_2018/SURFACE_AWS_116_DAY_2018_2018_2019.csv`
+
+Normalized UTF-8 station tables:
+
+- `25to1/data/stage1/processed/stations/SURFACE_ASOS_100_DAY_2018_2018_2019_normalized.csv`
+- `25to1/data/stage1/processed/stations/SURFACE_AWS_116_DAY_2018_2018_2019_normalized.csv`
+- manifest: `25to1/data/stage1/processed/stations/manifest.json`
+
+Row counts:
+
+- ASOS 2018 normalized rows: `365`
+- AWS 2018 normalized rows: `365`
+
+Added scripts:
+
+- `25to1/scripts/download_kma_station_fileset.py`
+- `25to1/scripts/normalize_kma_daily_station_csv.py`
