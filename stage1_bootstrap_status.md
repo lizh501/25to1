@@ -63,6 +63,7 @@ ERA5 文件检查:
 
 - 在 `python312` 环境里可通过 `netCDF4.Dataset` 正常读取
 - `xarray + netCDF4` 在当前中文绝对路径下有兼容问题，后续建议优先用相对路径或直接用 `netCDF4`
+- 已与 `MOD11A1` 日栅格和静态因子对齐，生成简化版日特征栈
 
 ### 4. SRTMGL1
 
@@ -102,10 +103,46 @@ ERA5 文件检查:
   - `25to1/scripts/build_mod11a1_daily_mosaics.py`
 - `SRTM` 派生脚本:
   - `25to1/scripts/derive_srtm_slope_aspect.py`
+- `MCD12Q1` 静态因子脚本:
+  - `25to1/scripts/build_mcd12q1_static_features.py`
+- 简化版特征栈脚本:
+  - `25to1/scripts/build_stage1_simplified_feature_stacks.py`
 - 样本文件 `MOD11A1.A2018001.h28v05...hdf` 检查结果:
   - `LST_Day_1km` 形状 `1200 x 1200`
   - 有效像元 `182,075`
   - 白天地表温度约 `-25.87°C ~ 15.15°C`
+
+### 6. 简化版一阶段特征栈
+
+- 目录:
+  - `25to1/data/stage1/processed/stage1_simplified_features`
+- 已生成天数:
+  - `31`
+- manifest:
+  - `25to1/data/stage1/processed/stage1_simplified_features/manifest.json`
+
+每个 `npz` 目前包含:
+
+- `era5_t2m_c`
+- `dem_m`
+- `slope_deg`
+- `aspect_deg`
+- `imp_proxy`
+- `lc_type1_majority`
+- `lst_day_c`
+- `lst_night_c`
+- `lst_mean_c`
+- `qc_day`
+- `qc_night`
+- `valid_day`
+- `valid_night`
+- `valid_mean`
+
+说明:
+
+- 这是“简化版标签流水线”，目标是先把 Stage 1 训练样本组织起来
+- 这里的 `lst_mean_c` 只是 `day/night` 的近似平均，不等于论文中的 `MODIS-derived air temperature`
+- 它适合下一步快速验证数据管线和模型输入接口
 
 ## 还没开始下载的数据
 
@@ -117,5 +154,5 @@ ERA5 文件检查:
 
 1. 补 `NDVI`
 2. 补 `incoming solar radiation`
-3. 用 `MOD11A1 + ERA5 + DEM/aspect + imp_proxy` 先搭一个简化版标签生成流水线
+3. 引入站点数据，拟合真正的 `MODIS-derived air temperature`
 4. 再扩展到 `2018` 全年甚至 `2000-2020`
