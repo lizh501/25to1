@@ -1,0 +1,127 @@
+# Stage 1 Bootstrap Baseline Results
+
+Updated: 2026-03-31
+
+## Scope
+
+This is a bootstrap Stage 1 baseline built from the January 2018 collocation table:
+
+- Dataset: `25to1/data/stage1/processed/station_collocations/stage1_station_collocations_2018_01.csv`
+- Target: `station_avg_temp_c`
+- Station count: `2`
+- Sample count: `62`
+
+The current goal is not to reproduce the paper's final Stage 1 label model yet. Instead, this baseline verifies that the data chain is runnable end to end:
+
+- `MOD11A1`
+- `ERA5 daily T2M`
+- `DEM / slope / aspect`
+- `MCD12Q1 land cover / imp proxy`
+- `NDVI`
+- `incoming solar radiation`
+- `KMA ASOS / AWS station observations`
+
+## Feature Set
+
+Grid-side continuous features:
+
+- `era5_t2m_c`
+- `dem_m`
+- `slope_deg`
+- `aspect_deg`
+- `imp_proxy`
+- `lc_type1_majority`
+- `lst_day_c`
+- `lst_night_c`
+- `lst_mean_c`
+- `ndvi`
+- `solar_incoming_w_m2`
+- `valid_day`
+- `valid_night`
+- `valid_mean`
+
+Optional categorical feature:
+
+- `source`
+
+## Time Split Result
+
+Experiment:
+
+- Train dates: `2018-01-01` to `2018-01-20`
+- Test dates: `2018-01-21` to `2018-01-31`
+- Train rows: `40`
+- Test rows: `22`
+- Output dir: `25to1/data/stage1/models/station_baseline_jan2018/time_split`
+
+Metrics:
+
+- `era5_only`: `MAE 4.124`, `RMSE 4.539`, `R2 0.337`
+- `linear_regression`: `MAE 1.775`, `RMSE 2.056`, `R2 0.864`
+- `random_forest`: `MAE 2.510`, `RMSE 3.166`, `R2 0.677`
+- `linear_regression_grid_only`: `MAE 1.775`, `RMSE 2.056`, `R2 0.864`
+- `random_forest_grid_only`: `MAE 2.461`, `RMSE 3.102`, `R2 0.690`
+
+Observation:
+
+- Even this small bootstrap feature stack improves clearly over raw `ERA5`.
+- `source` did not change the linear regression result in this January bootstrap run.
+
+## Leave-One-Station-Out Results
+
+### Hold Out Station 100
+
+Experiment:
+
+- Train station: `116`
+- Test station: `100`
+- Train rows: `31`
+- Test rows: `31`
+- Output dir: `25to1/data/stage1/models/station_baseline_jan2018/holdout_station_100`
+
+Metrics:
+
+- `era5_only`: `MAE 3.374`, `RMSE 3.762`, `R2 0.554`
+- `linear_regression`: `MAE 1.657`, `RMSE 2.174`, `R2 0.851`
+- `random_forest`: `MAE 1.658`, `RMSE 2.162`, `R2 0.853`
+- `linear_regression_grid_only`: `MAE 1.657`, `RMSE 2.174`, `R2 0.851`
+- `random_forest_grid_only`: `MAE 1.696`, `RMSE 2.207`, `R2 0.847`
+
+### Hold Out Station 116
+
+Experiment:
+
+- Train station: `100`
+- Test station: `116`
+- Train rows: `31`
+- Test rows: `31`
+- Output dir: `25to1/data/stage1/models/station_baseline_jan2018/holdout_station_116`
+
+Metrics:
+
+- `era5_only`: `MAE 3.611`, `RMSE 3.996`, `R2 0.579`
+- `linear_regression`: `MAE 1.434`, `RMSE 1.781`, `R2 0.916`
+- `random_forest`: `MAE 1.671`, `RMSE 2.000`, `R2 0.895`
+- `linear_regression_grid_only`: `MAE 1.434`, `RMSE 1.781`, `R2 0.916`
+- `random_forest_grid_only`: `MAE 1.664`, `RMSE 1.994`, `R2 0.895`
+
+Observation:
+
+- Under this bootstrap setup, cross-station generalization is still noticeably better than `ERA5` alone.
+- Because there are only `2` stations, these results are encouraging but still too optimistic to treat as a paper-level reproduction result.
+
+## Current Limitation
+
+- This baseline predicts station daily mean temperature, not the paper's full `MODIS-derived air temperature` target.
+- Only `2` stations are included so far.
+- Only `2018-01` is included so far.
+- The current `imp_proxy` is a reasonable proxy, not the paper author's explicitly released `Imp` formulation.
+- The current `NDVI` choice is a practical approximation using `MOD13A2 v061`.
+
+## Next Best Step
+
+The next most useful Stage 1 step is:
+
+1. Expand station coverage beyond the current `2` bootstrap stations.
+2. Scale the collocations from `2018-01` toward a longer temporal span.
+3. Replace the bootstrap station target with a closer approximation to the paper's `MODIS-derived air temperature` label construction.

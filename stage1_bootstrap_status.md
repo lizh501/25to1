@@ -265,6 +265,47 @@ Each collocation row currently includes:
   - `lst_day_c`
   - `lst_night_c`
   - `lst_mean_c`
+
+## Update 2026-03-31: bootstrap Stage 1 baseline trained
+
+Added baseline training script:
+
+- `25to1/scripts/train_stage1_station_baseline.py`
+
+Generated baseline result folders:
+
+- `25to1/data/stage1/models/station_baseline_jan2018/time_split`
+- `25to1/data/stage1/models/station_baseline_jan2018/holdout_station_100`
+- `25to1/data/stage1/models/station_baseline_jan2018/holdout_station_116`
+
+Generated summary note:
+
+- `25to1/stage1_baseline_results.md`
+
+Time-split January 2018 result:
+
+- train dates: `2018-01-01` to `2018-01-20`
+- test dates: `2018-01-21` to `2018-01-31`
+- `era5_only`: `MAE 4.124`, `RMSE 4.539`, `R2 0.337`
+- `linear_regression`: `MAE 1.775`, `RMSE 2.056`, `R2 0.864`
+- `random_forest`: `MAE 2.510`, `RMSE 3.166`, `R2 0.677`
+
+Leave-one-station-out result:
+
+- hold out station `100`:
+  - `era5_only`: `MAE 3.374`, `RMSE 3.762`, `R2 0.554`
+  - `linear_regression`: `MAE 1.657`, `RMSE 2.174`, `R2 0.851`
+  - `random_forest`: `MAE 1.658`, `RMSE 2.162`, `R2 0.853`
+- hold out station `116`:
+  - `era5_only`: `MAE 3.611`, `RMSE 3.996`, `R2 0.579`
+  - `linear_regression`: `MAE 1.434`, `RMSE 1.781`, `R2 0.916`
+  - `random_forest`: `MAE 1.671`, `RMSE 2.000`, `R2 0.895`
+
+Current interpretation:
+
+- The bootstrap feature stack already beats raw `ERA5` clearly.
+- The result is still only a bootstrap verification because it uses `2` stations and `2018-01` only.
+- The current target is station daily mean temperature, not the full paper-level `MODIS-derived air temperature`.
   - `ndvi`
   - `solar_incoming_j_m2_day`
   - `solar_incoming_w_m2`
