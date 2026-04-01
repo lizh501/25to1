@@ -70,6 +70,31 @@ def reproject_to_target(
     return dst
 
 
+def reproject_raster_path_to_target(
+    source_path: Path,
+    target_shape: tuple[int, int],
+    target_crs,
+    target_transform,
+    dst_nodata,
+    resampling: Resampling,
+    dst_dtype=np.float32,
+) -> np.ndarray:
+    with rasterio.open(source_path) as ds:
+        dst = np.full(target_shape, dst_nodata, dtype=dst_dtype)
+        reproject(
+            source=rasterio.band(ds, 1),
+            destination=dst,
+            src_transform=ds.transform,
+            src_crs=ds.crs,
+            src_nodata=ds.nodata,
+            dst_transform=target_transform,
+            dst_crs=target_crs,
+            dst_nodata=dst_nodata,
+            resampling=resampling,
+        )
+    return dst
+
+
 def build_era5_transform(lons: np.ndarray, lats: np.ndarray):
     lon_res = float(np.median(np.diff(lons)))
     lat_res = float(np.median(np.abs(np.diff(lats))))
@@ -89,6 +114,24 @@ def load_era5_monthly(path: Path):
     transform = build_era5_transform(lons, lats)
     date_to_idx = {datetime(t.year, t.month, t.day).date(): i for i, t in enumerate(times)}
     return ds, t2m, lats, lons, transform, date_to_idx
+
+
+def load_era5_collection(paths: list[Path]):
+    items = []
+    date_index: dict = {}
+    for path in paths:
+        ds, values, lats, lons, transform, date_to_idx = load_era5_monthly(path)
+        item = {
+            "path": path,
+            "ds": ds,
+            "values": values,
+            "transform": transform,
+            "date_to_idx": date_to_idx,
+        }
+        items.append(item)
+        for dt, idx in date_to_idx.items():
+            date_index[dt] = (item, idx)
+    return items, date_index
 
 
 def nanmean_two(a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -138,6 +181,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Build simplified Stage-1 daily feature stacks on the MOD11A1 grid.")
     parser.add_argument("--daily-dir", default="25to1/data/stage1/interim/mod11a1_daily")
     parser.add_argument("--era5", default="25to1/data/stage1/raw/era5_daily/era5_daily_t2m_2018_01.nc")
+    parser.add_argument("--era5-dir", default="", help="Optional directory containing monthly ERA5 daily T2M files.")
+    parser.add_argument("--era5-glob", default="era5_daily_t2m_*.nc", help="Glob used with --era5-dir.")
     parser.add_argument("--dem", default="25to1/data/stage1/processed/srtm_dem_korea_wgs84.tif")
     parser.add_argument("--slope", default="25to1/data/stage1/processed/srtm_slope_korea_wgs84.tif")
     parser.add_argument("--aspect", default="25to1/data/stage1/processed/srtm_aspect_korea_wgs84.tif")
@@ -155,19 +200,23 @@ def main() -> None:
     if args.start_day:
         days = [day for day in days if day >= args.start_day]
 
-    ds_era5, t2m, lats, lons, era5_transform, date_to_idx = load_era5_monthly(Path(args.era5).resolve())
+    if args.era5_dir:
+        era5_paths = sorted(Path(args.era5_dir).resolve().glob(args.era5_glob))
+    else:
+        era5_paths = [Path(args.era5).resolve()]
+    era5_items, era5_date_index = load_era5_collection(era5_paths)
 
-    dem_arr, dem_prof = read_raster(Path(args.dem).resolve())
-    slope_arr, slope_prof = read_raster(Path(args.slope).resolve())
-    aspect_arr, aspect_prof = read_raster(Path(args.aspect).resolve())
-    imp_arr, imp_prof = read_raster(Path(args.imp).resolve())
-    lc_arr, lc_prof = read_raster(Path(args.lc).resolve())
+    dem_path = Path(args.dem).resolve()
+    slope_path = Path(args.slope).resolve()
+    aspect_path = Path(args.aspect).resolve()
+    imp_path = Path(args.imp).resolve()
+    lc_path = Path(args.lc).resolve()
 
     built = 0
     for day in days:
         day_date = parse_modis_day(day).date()
-        if day_date not in date_to_idx:
-            print(f"SKIP {day}: no ERA5 match in monthly file")
+        if day_date not in era5_date_index:
+            print(f"SKIP {day}: no ERA5 match in provided files")
             continue
 
         day_dir = daily_dir / day
@@ -186,11 +235,12 @@ def main() -> None:
         target_crs = target_prof["crs"]
         nodata = target_prof["nodata"]
 
-        era5_day = t2m[date_to_idx[day_date], :, :].astype(np.float32) - 273.15
+        era5_item, era5_idx = era5_date_index[day_date]
+        era5_day = era5_item["values"][era5_idx, :, :].astype(np.float32) - 273.15
         era5_resampled = reproject_to_target(
             era5_day,
             WGS84,
-            era5_transform,
+            era5_item["transform"],
             target_shape,
             target_crs,
             target_transform,
@@ -199,60 +249,46 @@ def main() -> None:
             resampling=Resampling.bilinear,
         )
 
-        dem_resampled = reproject_to_target(
-            dem_arr.astype(np.float32),
-            dem_prof["crs"],
-            dem_prof["transform"],
+        dem_resampled = reproject_raster_path_to_target(
+            dem_path,
             target_shape,
             target_crs,
             target_transform,
-            src_nodata=dem_prof["nodata"],
             dst_nodata=np.nan,
             resampling=Resampling.bilinear,
         )
-        slope_resampled = reproject_to_target(
-            slope_arr.astype(np.float32),
-            slope_prof["crs"],
-            slope_prof["transform"],
+        slope_resampled = reproject_raster_path_to_target(
+            slope_path,
             target_shape,
             target_crs,
             target_transform,
-            src_nodata=slope_prof["nodata"],
             dst_nodata=np.nan,
             resampling=Resampling.bilinear,
         )
-        aspect_resampled = reproject_to_target(
-            aspect_arr.astype(np.float32),
-            aspect_prof["crs"],
-            aspect_prof["transform"],
+        aspect_resampled = reproject_raster_path_to_target(
+            aspect_path,
             target_shape,
             target_crs,
             target_transform,
-            src_nodata=aspect_prof["nodata"],
             dst_nodata=np.nan,
             resampling=Resampling.nearest,
         )
-        imp_resampled = reproject_to_target(
-            imp_arr.astype(np.float32),
-            imp_prof["crs"],
-            imp_prof["transform"],
+        imp_resampled = reproject_raster_path_to_target(
+            imp_path,
             target_shape,
             target_crs,
             target_transform,
-            src_nodata=imp_prof["nodata"],
             dst_nodata=np.nan,
             resampling=Resampling.bilinear,
         )
-        lc_resampled = reproject_to_target(
-            lc_arr.astype(np.float32),
-            lc_prof["crs"],
-            lc_prof["transform"],
+        lc_resampled = reproject_raster_path_to_target(
+            lc_path,
             target_shape,
             target_crs,
             target_transform,
-            src_nodata=lc_prof["nodata"],
             dst_nodata=-9999,
             resampling=Resampling.nearest,
+            dst_dtype=np.float32,
         ).astype(np.int16)
 
         lst_day = np.where(lst_day == nodata, np.nan, lst_day.astype(np.float32))
@@ -291,7 +327,8 @@ def main() -> None:
     manifest_path = output_dir / "manifest.json"
     manifest = rebuild_manifest(output_dir)
     manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
-    ds_era5.close()
+    for item in era5_items:
+        item["ds"].close()
     print(f"Done. built={built} manifest={manifest_path}")
 
 

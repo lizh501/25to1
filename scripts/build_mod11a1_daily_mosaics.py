@@ -131,6 +131,8 @@ def main() -> None:
     parser.add_argument("--config", default="25to1/configs/stage1_data_config.example.json")
     parser.add_argument("--output-dir", default="25to1/data/stage1/interim/mod11a1_daily")
     parser.add_argument("--day", default="", help="Optional single day like A2018001")
+    parser.add_argument("--start-day", default="", help="Optional inclusive start day like A2018032")
+    parser.add_argument("--skip-existing", action="store_true", help="Skip days whose output rasters already exist.")
     args = parser.parse_args()
 
     input_dir = Path(args.input_dir).resolve()
@@ -140,6 +142,8 @@ def main() -> None:
     grouped = group_files(input_dir)
 
     days = [args.day] if args.day else sorted(grouped)
+    if args.start_day:
+        days = [day for day in days if day >= args.start_day]
     built = 0
     skipped = 0
     for day in days:
@@ -147,6 +151,18 @@ def main() -> None:
         if len(tile_map) != 3:
             skipped += 1
             print(f"SKIP {day}: expected 3 tiles, got {len(tile_map)}")
+            continue
+
+        day_dir = output_dir / day
+        expected_outputs = [
+            day_dir / f"{day}_lst_day_c.tif",
+            day_dir / f"{day}_qc_day.tif",
+            day_dir / f"{day}_lst_night_c.tif",
+            day_dir / f"{day}_qc_night.tif",
+        ]
+        if args.skip_existing and all(path.exists() for path in expected_outputs):
+            skipped += 1
+            print(f"SKIP {day}: existing outputs")
             continue
 
         raw_day, transform, day_attrs = mosaic_tiles(tile_map, "LST_Day_1km")
@@ -162,7 +178,6 @@ def main() -> None:
         night_c, night_transform = clip_array(night_c, transform, bbox)
         qc_night, qc_night_transform = clip_array(qc_night, transform, bbox)
 
-        day_dir = output_dir / day
         write_tif(day_dir / f"{day}_lst_day_c.tif", np.where(np.isfinite(day_c), day_c, -9999).astype(np.float32), day_transform, "float32", -9999)
         write_tif(day_dir / f"{day}_qc_day.tif", qc_day.astype(np.uint8), qc_day_transform, "uint8", 255)
         write_tif(day_dir / f"{day}_lst_night_c.tif", np.where(np.isfinite(night_c), night_c, -9999).astype(np.float32), night_transform, "float32", -9999)

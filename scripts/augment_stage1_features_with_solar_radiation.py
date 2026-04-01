@@ -50,6 +50,24 @@ def load_era5_monthly(path: Path, variable: str):
     return ds, values, transform, date_to_idx
 
 
+def load_era5_collection(paths: list[Path], variable: str):
+    items = []
+    date_index: dict = {}
+    for path in paths:
+        ds, values, transform, date_to_idx = load_era5_monthly(path, variable)
+        item = {
+            "path": path,
+            "ds": ds,
+            "values": values,
+            "transform": transform,
+            "date_to_idx": date_to_idx,
+        }
+        items.append(item)
+        for dt, idx in date_to_idx.items():
+            date_index[dt] = (item, idx)
+    return items, date_index
+
+
 def reproject_to_target(
     source_array: np.ndarray,
     source_crs,
@@ -86,15 +104,19 @@ def main() -> None:
     parser.add_argument("--features-dir", default="25to1/data/stage1/processed/stage1_simplified_features")
     parser.add_argument("--daily-dir", default="25to1/data/stage1/interim/mod11a1_daily")
     parser.add_argument("--solar", default="25to1/data/stage1/raw/solar_radiation/era5_daily_ssrd_2018_01.nc")
+    parser.add_argument("--solar-dir", default="", help="Optional directory containing monthly solar NetCDF files.")
+    parser.add_argument("--solar-glob", default="era5_daily_ssrd_*.nc", help="Glob used with --solar-dir.")
     parser.add_argument("--variable", default="ssrd", help="NetCDF variable name, default: ssrd")
     parser.add_argument("--skip-existing", action="store_true", help="Skip npz files that already contain solar fields.")
     args = parser.parse_args()
 
     features_dir = Path(args.features_dir).resolve()
     daily_dir = Path(args.daily_dir).resolve()
-    solar_path = Path(args.solar).resolve()
-
-    ds_solar, solar_values, solar_transform, date_to_idx = load_era5_monthly(solar_path, args.variable)
+    if args.solar_dir:
+        solar_paths = sorted(Path(args.solar_dir).resolve().glob(args.solar_glob))
+    else:
+        solar_paths = [Path(args.solar).resolve()]
+    solar_items, solar_date_index = load_era5_collection(solar_paths, args.variable)
 
     updated = 0
     for npz_path in sorted(features_dir.glob("A*.npz")):
@@ -104,18 +126,19 @@ def main() -> None:
 
         day = npz_path.stem
         day_date = modis_day_to_date(day)
-        if day_date not in date_to_idx:
-            print(f"SKIP {day}: no solar match in monthly file")
+        if day_date not in solar_date_index:
+            print(f"SKIP {day}: no solar match in provided files")
             continue
 
         lst_day_path = next((daily_dir / day).glob("*_lst_day_c.tif"))
         target_crs, target_transform, target_h, target_w = target_grid_from_lst(lst_day_path)
 
-        solar_day = solar_values[date_to_idx[day_date], :, :].astype(np.float32)
+        solar_item, solar_idx = solar_date_index[day_date]
+        solar_day = solar_item["values"][solar_idx, :, :].astype(np.float32)
         solar_j_m2_day = reproject_to_target(
             solar_day,
             WGS84,
-            solar_transform,
+            solar_item["transform"],
             (target_h, target_w),
             target_crs,
             target_transform,
@@ -140,7 +163,8 @@ def main() -> None:
             f"solar_flux_mean={float(np.nanmean(solar_w_m2_mean)):.2f} W/m2"
         )
 
-    ds_solar.close()
+    for item in solar_items:
+        item["ds"].close()
     print(f"Done. updated={updated}")
 
 

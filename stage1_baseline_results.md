@@ -256,3 +256,70 @@ Current interpretation:
 
 - Once the station pool is widened enough, the previously unstable holdout behavior becomes much more reasonable.
 - The current January full-65 setup is a solid Stage-1 engineering checkpoint, even though it is still not the paper's final `MODIS-derived air temperature` target construction.
+
+## Update 2026-04-01: January+February full-65 extension
+
+We then extended the full-65 station bootstrap from January 2018 into February 2018.
+
+Extended artifacts:
+
+- `25to1/data/stage1/processed/station_collocations_full65_janfeb/stage1_station_collocations_2018_01.csv`
+- `25to1/data/stage1/processed/station_collocations_full65_janfeb/stage1_station_collocations_2018_01_summary.json`
+- `25to1/data/stage1/models/station_baseline_full65_janfeb/time_split_jan_train_feb_test/metrics_summary.json`
+- `25to1/data/stage1/models/station_baseline_full65_janfeb/holdout_station_108/metrics_summary.json`
+
+Important note:
+
+- the collocation file name still keeps the legacy `2018_01` suffix, but the actual content spans `2018-01-01` to `2018-02-28`
+
+Expanded collocation summary:
+
+- rows: `3835`
+- date range: `2018-01-01` to `2018-02-28`
+- station count: `65`
+
+### January-train / February-test time split
+
+Experiment:
+
+- train dates: `2018-01-01` to `2018-01-31`
+- test dates: `2018-02-01` to `2018-02-28`
+- train rows: `2010`
+- test rows: `1820`
+- output dir: `25to1/data/stage1/models/station_baseline_full65_janfeb/time_split_jan_train_feb_test`
+
+Metrics:
+
+- `era5_only`: `MAE 1.295`, `RMSE 1.686`, `R2 0.885`
+- `linear_regression`: `MAE 1.122`, `RMSE 1.435`, `R2 0.917`
+- `random_forest`: `MAE 1.148`, `RMSE 1.467`, `R2 0.913`
+- `linear_regression_grid_only`: `MAE 1.135`, `RMSE 1.452`, `R2 0.915`
+- `random_forest_grid_only`: `MAE 1.150`, `RMSE 1.468`, `R2 0.913`
+
+Interpretation:
+
+- This is a more meaningful temporal-generalization check than the earlier within-January split.
+- The current Stage-1 feature stack still improves materially over raw `ERA5` when trained on January and tested on a full unseen month.
+- The gap between `grid_only` and `grid_plus_source` remains small, which is a good sign that the gridded predictors themselves are carrying most of the signal.
+
+### January+February holdout check for station 108
+
+Experiment:
+
+- holdout station: `108`
+- train rows: `3771`
+- test rows: `59`
+- output dir: `25to1/data/stage1/models/station_baseline_full65_janfeb/holdout_station_108`
+
+Metrics:
+
+- `era5_only`: `MAE 0.944`, `RMSE 1.213`, `R2 0.945`
+- `linear_regression`: `MAE 0.932`, `RMSE 1.194`, `R2 0.947`
+- `random_forest`: `MAE 1.194`, `RMSE 1.433`, `R2 0.923`
+- `linear_regression_grid_only`: `MAE 0.993`, `RMSE 1.236`, `R2 0.943`
+- `random_forest_grid_only`: `MAE 1.191`, `RMSE 1.426`, `R2 0.924`
+
+Interpretation:
+
+- On the larger two-month set, the `linear_regression` baseline is currently the cleanest and most stable simple baseline for this bootstrap target.
+- The spatial holdout result remains strong enough to justify continuing time expansion before spending effort on heavier model tuning.
