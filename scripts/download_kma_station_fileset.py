@@ -15,11 +15,24 @@ SOURCE_CONFIG = {
     "asos": {
         "page_url": "https://data.kma.go.kr/data/grnd/selectAsosRltmList.do?pgmNo=36&tabNo=1",
         "default_station_id": "100",
+        "menu_no": "32",
+        "mddl_clss_cd": "SFC01",
+        "pgm_no": "36",
     },
     "aws": {
         "page_url": "https://data.kma.go.kr/data/grnd/selectAwsRltmList.do?pgmNo=56&tabNo=1",
         "default_station_id": "116",
+        "menu_no": "33",
+        "mddl_clss_cd": "SFC02",
+        "pgm_no": "56",
     },
+}
+
+
+DATA_FORM_BY_FREQUENCY = {
+    "day": "F00501",
+    "hr": "F00502",
+    "mi": "F00503",
 }
 
 
@@ -68,6 +81,70 @@ def build_target_name(source: str, station_id: str | None, frequency: str, year:
 def parse_fileset_values(html: str) -> list[str]:
     soup = BeautifulSoup(html, "html.parser")
     return [item.get("value", "") for item in soup.select('input[name="fileSizeMgList"]')]
+
+
+def build_search_payload(source: str, station_id: str, frequency: str, year: int, month: int | None) -> dict[str, str]:
+    config = SOURCE_CONFIG[source]
+    data_form_cd = DATA_FORM_BY_FREQUENCY[frequency]
+    payload = {
+        "cmmnCdList": "F00501,F00502,F00503,F00513",
+        "upperCmmnCode": "F005",
+        "lrgClssCd": "SFC",
+        "mddlClssCd": config["mddl_clss_cd"],
+        "menuNo": config["menu_no"],
+        "pageIndex": "1",
+        "stnIds": str(station_id),
+        "elementGroupSns": "",
+        "serviceSe": "F00101",
+        "txtStnNm": "",
+        "stnTreeId": "",
+        "mngRprtNo": "",
+        "ctlgNo": "",
+        "pgmNo": config["pgm_no"],
+        "schListCnt": "30",
+        "dataFormCd": data_form_cd,
+        "startDt": f"{year:04d}",
+        "endDt": f"{year:04d}",
+    }
+    if frequency == "mi":
+        if month is None:
+            raise ValueError("month is required for minute data")
+        payload["startMt"] = f"{month:02d}"
+        payload["endMt"] = f"{month:02d}"
+    else:
+        payload["startMt"] = "01"
+        payload["endMt"] = "12"
+    return payload
+
+
+def search_matching_fileset(
+    session: requests.Session,
+    source: str,
+    station_id: str,
+    frequency: str,
+    year: int,
+    month: int | None,
+) -> str:
+    target_name = build_target_name(source, station_id, frequency, year, month)
+    payload = build_search_payload(source, station_id, frequency, year, month)
+    response = fetch_with_retry(
+        session,
+        "POST",
+        SOURCE_CONFIG[source]["page_url"],
+        data=payload,
+        timeout=90,
+    )
+    values = parse_fileset_values(response.text)
+    for value in values:
+        parts = value.split("^")
+        if len(parts) != 4:
+            continue
+        _, _, file_path, _ = parts
+        file_name = Path(file_path).name
+        if file_name.startswith(target_name):
+            print(f"MATCH search station_id={station_id} file={file_name}")
+            return value
+    raise FileNotFoundError(f"No matching search-result fileset found for {source} station={station_id} {frequency} {year} {month or ''}".strip())
 
 
 def find_matching_fileset(
@@ -120,7 +197,7 @@ def login(session: requests.Session, username: str, password: str) -> None:
         "https://data.kma.go.kr/cmmn/loginSessionCheck.do",
         timeout=30,
     )
-    if '"data": 2' not in check_response.text:
+    if '"data": 2' not in check_response.text and '"data": 1' not in check_response.text:
         raise RuntimeError(f"KMA session check failed: {check_response.text[:500]}")
 
 
@@ -198,6 +275,10 @@ def sanitize_label(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+def safe_console_text(text: str) -> str:
+    return sanitize_label(text).encode("ascii", "ignore").decode("ascii")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Download KMA station filesets from the official portal.")
     parser.add_argument("--source", choices=sorted(SOURCE_CONFIG.keys()), required=True, help="Station source: asos or aws")
@@ -210,6 +291,12 @@ def main() -> None:
     parser.add_argument("--output-dir", default="25to1/data/stage1/raw/stations")
     parser.add_argument("--extract", action="store_true", help="Extract the returned outer zip and nested data zip.")
     parser.add_argument("--max-pages", type=int, default=20, help="Maximum fileset pages to scan")
+    parser.add_argument(
+        "--lookup-mode",
+        choices=["auto", "search", "history"],
+        default="auto",
+        help="Use real-time query search, download-history page scan, or auto.",
+    )
     args = parser.parse_args()
 
     env_path = resolve_input_path(args.env_file)
@@ -225,20 +312,30 @@ def main() -> None:
     session.headers.update({"User-Agent": "Mozilla/5.0"})
 
     login(session, username, password)
-    fileset_value = find_matching_fileset(
-        session,
-        source=args.source,
-        station_id=args.station_id,
-        frequency=args.frequency,
-        year=args.year,
-        month=month,
-        max_pages=args.max_pages,
-    )
+    if args.lookup_mode == "search" or (args.lookup_mode == "auto" and args.station_id):
+        fileset_value = search_matching_fileset(
+            session,
+            source=args.source,
+            station_id=str(args.station_id or SOURCE_CONFIG[args.source]["default_station_id"]),
+            frequency=args.frequency,
+            year=args.year,
+            month=month,
+        )
+    else:
+        fileset_value = find_matching_fileset(
+            session,
+            source=args.source,
+            station_id=args.station_id,
+            frequency=args.frequency,
+            year=args.year,
+            month=month,
+            max_pages=args.max_pages,
+        )
     popup_payload, popup_html = request_purpose_popup(session, fileset_value)
     labels = decode_purpose_labels(popup_html)
     print("PURPOSES")
     for value, label in labels:
-        print(f"  {value}: {sanitize_label(label)}")
+        print(f"  {value}: {safe_console_text(label)}")
 
     response = download_fileset(session, popup_payload, args.purpose_code)
     file_name = Path(popup_payload["fileCoursNms"]).name

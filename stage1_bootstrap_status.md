@@ -347,6 +347,65 @@ Interpretation:
 
 - We now have a much broader official station metadata base than the original `2`-station bootstrap.
 - The remaining bottleneck is no longer station location metadata, but downloading and normalizing the matching daily ASOS filesets for these stations.
+
+## Update 2026-04-01: multi-station January ASOS downloads working
+
+Validated station-query-based KMA download flow for daily ASOS filesets:
+
+- `25to1/scripts/download_kma_station_fileset.py`
+  - now supports real-time query lookup by `--station-id`
+  - validated with `--lookup-mode search`
+
+Newly downloaded ASOS daily 2018 files:
+
+- station `105`
+- station `108`
+- station `143`
+- station `159`
+- station `184`
+
+Extracted raw CSV directory:
+
+- `25to1/data/stage1/raw/stations/asos_day_2018`
+
+Normalized new UTF-8 station tables:
+
+- `25to1/data/stage1/processed/stations/SURFACE_ASOS_105_DAY_2018_2018_2019_normalized.csv`
+- `25to1/data/stage1/processed/stations/SURFACE_ASOS_108_DAY_2018_2018_2019_normalized.csv`
+- `25to1/data/stage1/processed/stations/SURFACE_ASOS_143_DAY_2018_2018_2019_normalized.csv`
+- `25to1/data/stage1/processed/stations/SURFACE_ASOS_159_DAY_2018_2018_2019_normalized.csv`
+- `25to1/data/stage1/processed/stations/SURFACE_ASOS_184_DAY_2018_2018_2019_normalized.csv`
+
+Added helper script:
+
+- `25to1/scripts/build_station_metadata_subset.py`
+
+Built January 7-station metadata subset:
+
+- `25to1/data/stage1/processed/stations/station_metadata_stage1_jan7.csv`
+
+Built January 7-station collocations:
+
+- `25to1/data/stage1/processed/station_collocations_jan7/stage1_station_collocations_2018_01.csv`
+- `25to1/data/stage1/processed/station_collocations_jan7/stage1_station_collocations_2018_01_summary.json`
+
+7-station collocation summary:
+
+- rows: `217`
+- sources: `asos`, `aws`
+- station ids: `100`, `105`, `108`, `116`, `143`, `159`, `184`
+
+Built January 7-station baseline outputs:
+
+- `25to1/data/stage1/models/station_baseline_jan7/time_split`
+- `25to1/data/stage1/models/station_baseline_jan7/holdout_station_108`
+- `25to1/data/stage1/models/station_baseline_jan7/holdout_station_159`
+
+7-station time-split headline result:
+
+- `era5_only`: `MAE 2.058`, `RMSE 2.753`, `R2 0.846`
+- `linear_regression_grid_only`: `MAE 1.465`, `RMSE 1.765`, `R2 0.937`
+- `random_forest_grid_only`: `MAE 1.920`, `RMSE 2.526`, `R2 0.870`
   - `ndvi`
   - `solar_incoming_j_m2_day`
   - `solar_incoming_w_m2`

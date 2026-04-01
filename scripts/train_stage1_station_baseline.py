@@ -95,7 +95,7 @@ def build_preprocessor(categorical_features: list[str]) -> ColumnTransformer:
         categorical_pipeline = Pipeline(
             steps=[
                 ("imputer", SimpleImputer(strategy="most_frequent")),
-                ("onehot", OneHotEncoder(handle_unknown="ignore")),
+                ("onehot", OneHotEncoder(handle_unknown="ignore", drop="if_binary")),
             ]
         )
         transformers.append(("cat", categorical_pipeline, categorical_features))

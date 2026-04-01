@@ -125,3 +125,69 @@ The next most useful Stage 1 step is:
 1. Expand station coverage beyond the current `2` bootstrap stations.
 2. Scale the collocations from `2018-01` toward a longer temporal span.
 3. Replace the bootstrap station target with a closer approximation to the paper's `MODIS-derived air temperature` label construction.
+
+## Update 2026-04-01: January 7-station expansion
+
+We expanded the January 2018 bootstrap set from `2` stations to `7` stations:
+
+- ASOS: `100`, `105`, `108`, `143`, `159`, `184`
+- AWS: `116`
+
+Expanded metadata and collocation artifacts:
+
+- `25to1/data/stage1/processed/stations/station_metadata_stage1_jan7.csv`
+- `25to1/data/stage1/processed/station_collocations_jan7/stage1_station_collocations_2018_01.csv`
+- `25to1/data/stage1/processed/station_collocations_jan7/stage1_station_collocations_2018_01_summary.json`
+
+Expanded collocation summary:
+
+- rows: `217`
+- date range: `2018-01-01` to `2018-01-31`
+- station count: `7`
+
+### 7-station time split
+
+Experiment:
+
+- train dates: `2018-01-01` to `2018-01-20`
+- test dates: `2018-01-21` to `2018-01-31`
+- train rows: `140`
+- test rows: `77`
+- output dir: `25to1/data/stage1/models/station_baseline_jan7/time_split`
+
+Metrics:
+
+- `era5_only`: `MAE 2.058`, `RMSE 2.753`, `R2 0.846`
+- `linear_regression`: `MAE 1.468`, `RMSE 1.764`, `R2 0.937`
+- `random_forest`: `MAE 1.903`, `RMSE 2.498`, `R2 0.873`
+- `linear_regression_grid_only`: `MAE 1.465`, `RMSE 1.765`, `R2 0.937`
+- `random_forest_grid_only`: `MAE 1.920`, `RMSE 2.526`, `R2 0.870`
+
+Interpretation:
+
+- After expanding to `7` stations, the January time-split baseline is materially more credible than the original `2`-station bootstrap.
+- The current Stage-1 feature stack still improves over raw `ERA5`.
+
+### 7-station holdout checks
+
+Hold out station `108`:
+
+- `era5_only`: `MAE 1.136`, `RMSE 1.422`, `R2 0.935`
+- `random_forest_grid_only`: `MAE 1.777`, `RMSE 2.056`, `R2 0.864`
+- `random_forest`: `MAE 1.672`, `RMSE 1.959`, `R2 0.876`
+- `linear_regression_grid_only`: `MAE 2.837`, `RMSE 3.092`, `R2 0.692`
+- `linear_regression`: unstable in this holdout setting and should not be trusted as the preferred cross-station estimate
+
+Hold out station `159`:
+
+- `era5_only`: `MAE 1.237`, `RMSE 1.560`, `R2 0.872`
+- `linear_regression_grid_only`: `MAE 0.961`, `RMSE 1.190`, `R2 0.926`
+- `random_forest_grid_only`: `MAE 1.588`, `RMSE 2.014`, `R2 0.787`
+- `random_forest`: `MAE 1.594`, `RMSE 2.018`, `R2 0.786`
+- `linear_regression`: `MAE 1.859`, `RMSE 2.151`, `R2 0.757`
+
+Current interpretation:
+
+- The January `7`-station set is already useful for debugging Stage-1 inputs and model behavior.
+- Cross-station generalization is still station-dependent and should be treated as a diagnostic result, not a final paper-level reproduction metric.
+- The next major gain will come from extending both station count and time span, rather than tuning the current January-only baseline too aggressively.
