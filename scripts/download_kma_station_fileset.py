@@ -14,11 +14,11 @@ from stage1_common import load_env_file
 SOURCE_CONFIG = {
     "asos": {
         "page_url": "https://data.kma.go.kr/data/grnd/selectAsosRltmList.do?pgmNo=36&tabNo=1",
-        "token": "ASOS_100",
+        "default_station_id": "100",
     },
     "aws": {
         "page_url": "https://data.kma.go.kr/data/grnd/selectAwsRltmList.do?pgmNo=56&tabNo=1",
-        "token": "AWS_116",
+        "default_station_id": "116",
     },
 }
 
@@ -54,15 +54,15 @@ def fetch_with_retry(session: requests.Session, method: str, url: str, **kwargs)
     raise RuntimeError(f"Failed after retries: {method} {url}") from last_error
 
 
-def build_target_name(source: str, frequency: str, year: int, month: int | None = None) -> str:
-    token = SOURCE_CONFIG[source]["token"]
+def build_target_name(source: str, station_id: str | None, frequency: str, year: int, month: int | None = None) -> str:
+    station_text = str(station_id or SOURCE_CONFIG[source]["default_station_id"])
     src = source.upper()
     if frequency == "mi":
         if month is None:
             raise ValueError("month is required for minute data")
         month_text = f"{year:04d}-{month:02d}"
-        return f"SURFACE_{src}_{token}_{frequency.upper()}_{month_text}_{month_text}_"
-    return f"SURFACE_{src}_{token}_{frequency.upper()}_{year:04d}_{year:04d}_"
+        return f"SURFACE_{src}_{station_text}_{frequency.upper()}_{month_text}_{month_text}_"
+    return f"SURFACE_{src}_{station_text}_{frequency.upper()}_{year:04d}_{year:04d}_"
 
 
 def parse_fileset_values(html: str) -> list[str]:
@@ -73,12 +73,13 @@ def parse_fileset_values(html: str) -> list[str]:
 def find_matching_fileset(
     session: requests.Session,
     source: str,
+    station_id: str | None,
     frequency: str,
     year: int,
     month: int | None,
     max_pages: int,
 ) -> str:
-    target_name = build_target_name(source, frequency, year, month)
+    target_name = build_target_name(source, station_id, frequency, year, month)
     page_url = SOURCE_CONFIG[source]["page_url"]
 
     for page_idx in range(1, max_pages + 1):
@@ -200,6 +201,7 @@ def sanitize_label(text: str) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Download KMA station filesets from the official portal.")
     parser.add_argument("--source", choices=sorted(SOURCE_CONFIG.keys()), required=True, help="Station source: asos or aws")
+    parser.add_argument("--station-id", default=None, help="Station ID embedded in the fileset name, for example 100 or 116.")
     parser.add_argument("--frequency", choices=["day", "hr", "mi"], required=True, help="Fileset frequency")
     parser.add_argument("--year", type=int, required=True, help="Target year")
     parser.add_argument("--month", type=int, default=0, help="Required only for minute data")
@@ -226,6 +228,7 @@ def main() -> None:
     fileset_value = find_matching_fileset(
         session,
         source=args.source,
+        station_id=args.station_id,
         frequency=args.frequency,
         year=args.year,
         month=month,

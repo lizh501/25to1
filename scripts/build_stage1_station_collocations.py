@@ -24,6 +24,17 @@ def load_station_rows(path: Path) -> list[dict]:
         return list(csv.DictReader(f))
 
 
+def load_station_rows_from_paths(paths: list[Path]) -> dict[str, list[dict]]:
+    tables: dict[str, list[dict]] = {}
+    for path in paths:
+        rows = load_station_rows(path)
+        if not rows:
+            continue
+        source = rows[0]["source"]
+        tables.setdefault(source, []).extend(rows)
+    return tables
+
+
 def target_rowcol(lst_day_path: Path, lon: float, lat: float) -> tuple[int, int]:
     with rasterio.open(lst_day_path) as ds:
         xs, ys = transform("EPSG:4326", ds.crs, [lon], [lat])
@@ -68,6 +79,8 @@ def build_records(
     for meta in metadata_rows:
         source = meta["source"]
         station_id = meta["station_id"]
+        if source not in station_tables:
+            continue
         rows = station_tables[source]
         lon = float(meta["longitude"])
         lat = float(meta["latitude"])
@@ -123,16 +136,18 @@ def main() -> None:
     parser.add_argument("--station-meta", default="25to1/data/stage1/processed/stations/station_metadata_bootstrap.csv")
     parser.add_argument("--asos", default="25to1/data/stage1/processed/stations/SURFACE_ASOS_100_DAY_2018_2018_2019_normalized.csv")
     parser.add_argument("--aws", default="25to1/data/stage1/processed/stations/SURFACE_AWS_116_DAY_2018_2018_2019_normalized.csv")
+    parser.add_argument("--station-csvs", nargs="*", default=None, help="Optional explicit list of normalized station CSV files.")
     parser.add_argument("--features-dir", default="25to1/data/stage1/processed/stage1_simplified_features")
     parser.add_argument("--daily-dir", default="25to1/data/stage1/interim/mod11a1_daily")
     parser.add_argument("--output-dir", default="25to1/data/stage1/processed/station_collocations")
     args = parser.parse_args()
 
     metadata_rows = load_station_metadata(Path(args.station_meta).resolve())
-    station_tables = {
-        "asos": load_station_rows(Path(args.asos).resolve()),
-        "aws": load_station_rows(Path(args.aws).resolve()),
-    }
+    if args.station_csvs:
+        station_paths = [Path(item).resolve() for item in args.station_csvs]
+    else:
+        station_paths = [Path(args.asos).resolve(), Path(args.aws).resolve()]
+    station_tables = load_station_rows_from_paths(station_paths)
 
     records = build_records(
         metadata_rows,

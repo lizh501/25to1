@@ -306,6 +306,47 @@ Current interpretation:
 - The bootstrap feature stack already beats raw `ERA5` clearly.
 - The result is still only a bootstrap verification because it uses `2` stations and `2018-01` only.
 - The current target is station daily mean temperature, not the full paper-level `MODIS-derived air temperature`.
+
+## Update 2026-03-31: ASOS station expansion scaffold added
+
+Added scripts for batch station expansion:
+
+- `25to1/scripts/list_kma_station_filesets.py`
+- `25to1/scripts/fetch_kma_station_detail_pages.py`
+- `25to1/scripts/build_kma_station_metadata_table.py`
+
+Updated scripts:
+
+- `25to1/scripts/download_kma_station_fileset.py`
+  - now supports `--station-id`
+- `25to1/scripts/build_stage1_station_collocations.py`
+  - now supports multiple normalized station CSV inputs via `--station-csvs`
+
+Added official ASOS candidate list:
+
+- `25to1/data/stage1/interim/kma_asos_candidate_stations_62.csv`
+
+Batch-fetched public station detail pages:
+
+- directory: `25to1/data/stage1/interim/kma_station_details_asos62`
+- saved detail HTML count: `64`
+
+Built batch ASOS station metadata:
+
+- `25to1/data/stage1/processed/stations/station_metadata_asos62.csv`
+- `25to1/data/stage1/processed/stations/station_metadata_asos62.json`
+- `25to1/data/stage1/processed/stations/station_metadata_asos62_summary.json`
+
+Current ASOS metadata summary:
+
+- row count: `64`
+- latitude range: `33.24616` to `38.25085`
+- longitude range: `124.71237` to `130.89863`
+
+Interpretation:
+
+- We now have a much broader official station metadata base than the original `2`-station bootstrap.
+- The remaining bottleneck is no longer station location metadata, but downloading and normalizing the matching daily ASOS filesets for these stations.
   - `ndvi`
   - `solar_incoming_j_m2_day`
   - `solar_incoming_w_m2`

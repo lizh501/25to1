@@ -107,7 +107,24 @@ Successfully downloaded:
 - `25to1/scripts/normalize_kma_daily_station_csv.py`
 - `25to1/scripts/build_kma_station_metadata.py`
 - `25to1/scripts/build_stage1_station_collocations.py`
+- `25to1/scripts/list_kma_station_filesets.py`
+- `25to1/scripts/fetch_kma_station_detail_pages.py`
+- `25to1/scripts/build_kma_station_metadata_table.py`
 
 ## Next step
 
 Use the normalized UTF-8 station tables plus the collocated January 2018 grid samples as the target-side bootstrap data source for Stage-1 label modeling.
+
+## Update 2026-03-31: station expansion progress
+
+We now also have a batch station-metadata path for ASOS candidate stations:
+
+- candidate station list: `25to1/data/stage1/interim/kma_asos_candidate_stations_62.csv`
+- fetched detail-page dir: `25to1/data/stage1/interim/kma_station_details_asos62`
+- metadata table: `25to1/data/stage1/processed/stations/station_metadata_asos62.csv`
+
+This confirms that:
+
+- public station detail pages can be fetched in batch without the login gate
+- station coordinates / elevation can be scaled beyond the original `2`-station bootstrap
+- the remaining Stage-1 station bottleneck is batch daily-fileset download and normalization, not station metadata discovery
