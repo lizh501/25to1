@@ -94,3 +94,81 @@ The clean next upgrade is to make the bootstrap MODIS-AT surrogate split-aware:
 4. retrain the CNN on the leakage-reduced target set
 
 That will give a much more honest Stage-1 baseline before moving on to a closer SR-Weather implementation.
+
+## 7. Update: split-aware bootstrap label training
+
+That next step has now been completed once.
+
+### 7.1 Split-aware label source
+
+Instead of training the bootstrap MODIS-AT surrogate on the full `Q1` collocation set, we trained it only on the `Jan+Feb` collocations:
+
+- surrogate model summary:
+  - `25to1/data/stage1/models/modis_at_bootstrap_q1_janfebtrain/training_summary.json`
+- surrogate raster outputs:
+  - `25to1/data/stage1/processed/modis_at_bootstrap_q1_janfebtrain`
+- split-aware patch index:
+  - `25to1/data/stage1/processed/stage1_patch_index_q1_janfebtrain_ps64_s64_v50/stage1_patch_index.csv`
+
+### 7.2 Split-aware CNN training run
+
+Output directory:
+
+- `25to1/data/stage1/models/stage1_patch_cnn_q1_janfebtrain_ps64_s64_v50`
+
+Files:
+
+- `25to1/data/stage1/models/stage1_patch_cnn_q1_janfebtrain_ps64_s64_v50/best_model.pt`
+- `25to1/data/stage1/models/stage1_patch_cnn_q1_janfebtrain_ps64_s64_v50/training_summary.json`
+
+Configuration:
+
+- device: `cuda`
+- epochs: `2`
+- batch size: `16`
+- train patches: `1325`
+- test patches: `807`
+
+Results:
+
+Epoch 1:
+
+- train `MAE 0.408`
+- train `RMSE 0.578`
+- test `MAE 0.266`
+- test `RMSE 0.375`
+
+Epoch 2:
+
+- train `MAE 0.226`
+- train `RMSE 0.307`
+- test `MAE 0.211`
+- test `RMSE 0.294`
+
+### 7.3 Comparison to the earlier optimistic run
+
+Earlier full-Q1 pseudo-label run, epoch 2:
+
+- test `MAE 0.173`
+- test `RMSE 0.245`
+
+Current split-aware run, epoch 2:
+
+- test `MAE 0.211`
+- test `RMSE 0.294`
+
+Interpretation:
+
+- the split-aware result is worse than the earlier optimistic result, which is expected and healthy
+- that drop confirms the earlier full-Q1 pseudo-label setup was indeed easier
+- the new split-aware run should be treated as the more honest Stage-1 baseline checkpoint
+
+## 8. Updated best next step
+
+Now that we have a stricter patch-training baseline, the next most valuable move is no longer just another leakage fix.
+
+The next major upgrade should be one of:
+
+1. replace the current small CNN with a closer `SE-SRCNN` baseline
+2. add the paper-inspired pooling/attention modification toward `SR-Weather`
+3. improve the label-construction stage itself with a closer approximation to the paper's `MODIS-derived air temperature`

@@ -768,3 +768,37 @@ Current interpretation:
 - The Stage-1 patch dataloader, mask-aware loss, patch sampling, and checkpoint pipeline are now fully runnable.
 - This is an engineering milestone, not yet a strict paper-level reproduction result.
 - The current patch labels are generated from a bootstrap surrogate trained on the full `Q1` collocation set, so these patch metrics should be treated as pipeline-validation metrics rather than leakage-free benchmark numbers.
+
+## Update 2026-04-01: split-aware Stage-1 patch CNN baseline completed
+
+We then tightened the Stage-1 patch-training setup by making the bootstrap pseudo-label source split-aware.
+
+What changed:
+
+- bootstrap MODIS-AT surrogate retrained using only `Jan+Feb` collocations
+- generated a new full-Q1 pseudo-label directory from that train-only surrogate
+- rebuilt the patch index against that stricter pseudo-label source
+- reran the same patch CNN baseline
+
+New artifacts:
+
+- `25to1/data/stage1/models/modis_at_bootstrap_q1_janfebtrain/training_summary.json`
+- `25to1/data/stage1/processed/modis_at_bootstrap_q1_janfebtrain/manifest.json`
+- `25to1/data/stage1/processed/stage1_patch_index_q1_janfebtrain_ps64_s64_v50/stage1_patch_index.csv`
+- `25to1/data/stage1/processed/stage1_patch_index_q1_janfebtrain_ps64_s64_v50/stage1_patch_index_summary.json`
+- `25to1/data/stage1/models/stage1_patch_cnn_q1_janfebtrain_ps64_s64_v50/training_summary.json`
+
+Split-aware patch CNN headline result:
+
+- epoch 1 test: `MAE 0.266`, `RMSE 0.375`
+- epoch 2 test: `MAE 0.211`, `RMSE 0.294`
+
+Comparison against the earlier optimistic full-Q1 pseudo-label run:
+
+- earlier epoch 2 test `RMSE`: `0.245`
+- split-aware epoch 2 test `RMSE`: `0.294`
+
+Current interpretation:
+
+- The stricter split-aware result is worse than the earlier optimistic run, which is exactly what we would expect from a healthier evaluation setup.
+- This split-aware patch CNN is the more honest Stage-1 engineering baseline to build on from here.
