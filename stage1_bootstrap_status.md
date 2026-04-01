@@ -639,3 +639,99 @@ Current interpretation:
 - We now have a complete Q1 engineering dataset for the Stage-1 bootstrap target.
 - The cross-month result is harder in March than in February, and the simple linear baseline no longer beats raw `ERA5` on the March holdout month.
 - That behavior is useful: it suggests Q1 is already exposing seasonal shift, which is exactly the kind of signal we want before moving on to the paper's true label-construction stage.
+
+## Update 2026-04-01: bootstrap MODIS-derived AT surrogate built
+
+We then moved one step closer to the paper's Stage-1 label-construction workflow by training a simple station-to-grid surrogate and applying it to the full Q1 1-km feature stacks.
+
+Added script:
+
+- `25to1/scripts/build_stage1_modis_at_bootstrap.py`
+
+What this script does:
+
+- trains a grid-only regression model on the full `Q1` station collocation set
+- uses the existing Stage-1 feature stack (`ERA5`, `DEM`, `slope`, `aspect`, `imp`, `land cover`, `LST`, `NDVI`, `solar`) to predict daily 1-km air temperature
+- writes a daily GeoTIFF label raster plus a valid-mask raster
+
+Important scope note:
+
+- this is still a bootstrap surrogate for `MODIS-derived air temperature`, not the paper's final official label-construction recipe
+- it is useful as a working engineering label product for Stage-1 dataset assembly and model debugging
+
+Model and output artifacts:
+
+- `25to1/data/stage1/models/modis_at_bootstrap_q1/linear_regression_grid_only.joblib`
+- `25to1/data/stage1/models/modis_at_bootstrap_q1/training_summary.json`
+- `25to1/data/stage1/processed/modis_at_bootstrap_q1/manifest.json`
+
+Per-day output layout:
+
+- `25to1/data/stage1/processed/modis_at_bootstrap_q1/A2018001/A2018001_modis_at_bootstrap_c.tif`
+- `25to1/data/stage1/processed/modis_at_bootstrap_q1/A2018001/A2018001_modis_at_bootstrap_valid.tif`
+- ...
+- `25to1/data/stage1/processed/modis_at_bootstrap_q1/A2018090/A2018090_modis_at_bootstrap_c.tif`
+
+Bootstrap MODIS-AT surrogate summary:
+
+- days built: `90`
+- coverage: `2018-01-01` to `2018-03-31`
+- training rows: `5845`
+- training fit (`linear_regression`, grid-only):
+  - `MAE 1.262`
+  - `RMSE 1.629`
+  - `R2 0.943`
+
+Inference-side safeguards added:
+
+- prediction now requires both `valid_mean == 1` and valid static land inputs
+- invalid `DEM` sentinel values (for example `<= -10000`) are excluded from prediction
+- negative `land-cover` sentinel values are excluded from prediction
+
+This fix was necessary because an earlier first pass produced unrealistic extremes by letting nodata-coded static values leak into model inference.
+
+Post-fix raster sanity check:
+
+- across the Q1 manifest, daily prediction minima and maxima now fall roughly within `-29.54°C` to `19.39°C`
+- example `A2018090` raster mean: `12.74°C`
+- example `A2018090` raster range: `4.46°C` to `18.11°C`
+
+Current interpretation:
+
+- We now have a concrete daily 1-km pseudo-label raster product rather than only point collocations.
+- That means the next step can finally move from "station baseline engineering" toward "full Stage-1 patch dataset assembly" using a spatial label field.
+
+## Update 2026-04-01: Q1 Stage-1 patch index built
+
+We then converted the Q1 feature stacks plus bootstrap MODIS-AT surrogate rasters into a training-ready patch index.
+
+Added script:
+
+- `25to1/scripts/build_stage1_patch_index.py`
+
+Bootstrap patch-index configuration used for the first pass:
+
+- patch size: `64`
+- stride: `64`
+- minimum valid-label fraction: `0.50`
+- split date: `2018-03-01`
+  - `train`: `2018-01-01` to `2018-02-28`
+  - `test`: `2018-03-01` to `2018-03-31`
+
+Artifacts:
+
+- `25to1/data/stage1/processed/stage1_patch_index_q1_ps64_s64_v50/stage1_patch_index.csv`
+- `25to1/data/stage1/processed/stage1_patch_index_q1_ps64_s64_v50/stage1_patch_index_summary.json`
+
+Patch-index summary:
+
+- indexed days with at least one valid patch: `85`
+- total patches: `2132`
+- training patches: `1325`
+- test patches: `807`
+
+Interpretation:
+
+- We now have a concrete, date-split Stage-1 patch manifest rather than only daily rasters.
+- This is enough to move on to a first real Stage-1 super-resolution training dataloader without redoing data preparation.
+- Some cloud-heavy days naturally contribute zero patches under the current `50%` valid-label threshold, which is expected and consistent with the paper's missing-label challenge.
