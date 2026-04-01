@@ -21,23 +21,27 @@ def parse_keep_items(values: list[str]) -> set[tuple[str, str]]:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build a combined subset station-metadata CSV for selected source/station pairs.")
     parser.add_argument("--inputs", nargs="+", required=True, help="One or more metadata CSV files.")
-    parser.add_argument("--keep", nargs="+", required=True, help="Pairs like asos:108 aws:116")
+    parser.add_argument("--keep", nargs="*", default=[], help="Pairs like asos:108 aws:116")
+    parser.add_argument("--keep-source", nargs="*", default=[], help="Keep all rows whose source is in this list, for example asos aws")
     parser.add_argument("--output-csv", required=True)
     args = parser.parse_args()
 
-    keep_pairs = parse_keep_items(args.keep)
+    keep_pairs = parse_keep_items(args.keep) if args.keep else set()
+    keep_sources = {item.strip() for item in args.keep_source if item.strip()}
     rows: list[dict] = []
     seen: set[tuple[str, str]] = set()
     for item in args.inputs:
         for row in load_rows(Path(item)):
             key = (row["source"], row["station_id"])
-            if key in keep_pairs and key not in seen:
+            if (key in keep_pairs or row["source"] in keep_sources) and key not in seen:
                 rows.append(row)
                 seen.add(key)
 
     missing = sorted(keep_pairs - seen)
     if missing:
         raise RuntimeError(f"Missing requested metadata rows: {missing}")
+    if not rows:
+        raise RuntimeError("No metadata rows matched the requested filters.")
 
     output_csv = Path(args.output_csv)
     output_csv.parent.mkdir(parents=True, exist_ok=True)

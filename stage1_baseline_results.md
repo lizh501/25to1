@@ -191,3 +191,68 @@ Current interpretation:
 - The January `7`-station set is already useful for debugging Stage-1 inputs and model behavior.
 - Cross-station generalization is still station-dependent and should be treated as a diagnostic result, not a final paper-level reproduction metric.
 - The next major gain will come from extending both station count and time span, rather than tuning the current January-only baseline too aggressively.
+
+## Update 2026-04-01: January full-65-station expansion
+
+We then expanded the January 2018 collocation set to the full currently available station pool:
+
+- `64` ASOS stations
+- `1` AWS station
+- total stations: `65`
+
+Expanded artifacts:
+
+- `25to1/data/stage1/processed/stations/station_metadata_stage1_full65.csv`
+- `25to1/data/stage1/processed/station_collocations_full65/stage1_station_collocations_2018_01.csv`
+- `25to1/data/stage1/processed/station_collocations_full65/stage1_station_collocations_2018_01_summary.json`
+
+Expanded collocation summary:
+
+- rows: `2015`
+- date range: `2018-01-01` to `2018-01-31`
+- station count: `65`
+
+### Full-65 time split
+
+Experiment:
+
+- train dates: `2018-01-01` to `2018-01-20`
+- test dates: `2018-01-21` to `2018-01-31`
+- train rows: `1295`
+- test rows: `715`
+- output dir: `25to1/data/stage1/models/station_baseline_full65/time_split`
+
+Metrics:
+
+- `era5_only`: `MAE 1.638`, `RMSE 2.050`, `R2 0.870`
+- `linear_regression`: `MAE 1.545`, `RMSE 1.897`, `R2 0.889`
+- `random_forest`: `MAE 1.645`, `RMSE 2.070`, `R2 0.867`
+- `linear_regression_grid_only`: `MAE 1.559`, `RMSE 1.921`, `R2 0.886`
+- `random_forest_grid_only`: `MAE 1.644`, `RMSE 2.069`, `R2 0.868`
+
+Interpretation:
+
+- The Stage-1 feature stack still improves over raw `ERA5`, but the gain is now more modest on the larger `65`-station set.
+- This is actually a healthier sign than the tiny bootstrap results because the task is now much less toy-like.
+
+### Full-65 holdout check for station 108
+
+Experiment:
+
+- holdout station: `108`
+- train rows: `1979`
+- test rows: `31`
+- output dir: `25to1/data/stage1/models/station_baseline_full65/holdout_station_108`
+
+Metrics:
+
+- `era5_only`: `MAE 1.136`, `RMSE 1.422`, `R2 0.935`
+- `linear_regression`: `MAE 1.115`, `RMSE 1.362`, `R2 0.940`
+- `random_forest`: `MAE 1.074`, `RMSE 1.301`, `R2 0.945`
+- `linear_regression_grid_only`: `MAE 1.153`, `RMSE 1.387`, `R2 0.938`
+- `random_forest_grid_only`: `MAE 1.064`, `RMSE 1.293`, `R2 0.946`
+
+Current interpretation:
+
+- Once the station pool is widened enough, the previously unstable holdout behavior becomes much more reasonable.
+- The current January full-65 setup is a solid Stage-1 engineering checkpoint, even though it is still not the paper's final `MODIS-derived air temperature` target construction.

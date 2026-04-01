@@ -406,6 +406,61 @@ Built January 7-station baseline outputs:
 - `era5_only`: `MAE 2.058`, `RMSE 2.753`, `R2 0.846`
 - `linear_regression_grid_only`: `MAE 1.465`, `RMSE 1.765`, `R2 0.937`
 - `random_forest_grid_only`: `MAE 1.920`, `RMSE 2.526`, `R2 0.870`
+
+## Update 2026-04-01: full-65 January station set built
+
+Added batch ASOS download script:
+
+- `25to1/scripts/download_kma_station_batch.py`
+
+Optimized collocation script:
+
+- `25to1/scripts/build_stage1_station_collocations.py`
+  - now caches station pixel locations
+  - now samples Stage-1 `npz` stacks by day instead of reopening per record
+  - now supports `--station-csv-dir` plus glob patterns
+
+Full January station coverage now available:
+
+- ASOS normalized 2018 station tables: `64`
+- AWS normalized 2018 station tables: `1`
+- total station count used for the current full set: `65`
+
+Built full January metadata subset:
+
+- `25to1/data/stage1/processed/stations/station_metadata_stage1_full65.csv`
+
+Built full January collocations:
+
+- `25to1/data/stage1/processed/station_collocations_full65/stage1_station_collocations_2018_01.csv`
+- `25to1/data/stage1/processed/station_collocations_full65/stage1_station_collocations_2018_01_summary.json`
+
+Full collocation summary:
+
+- rows: `2015`
+- date range: `2018-01-01` to `2018-01-31`
+- station count: `65`
+
+Built full January baseline outputs:
+
+- `25to1/data/stage1/models/station_baseline_full65/time_split`
+- `25to1/data/stage1/models/station_baseline_full65/holdout_station_108`
+
+Full-65 time-split headline result:
+
+- `era5_only`: `MAE 1.638`, `RMSE 2.050`, `R2 0.870`
+- `linear_regression`: `MAE 1.545`, `RMSE 1.897`, `R2 0.889`
+- `linear_regression_grid_only`: `MAE 1.559`, `RMSE 1.921`, `R2 0.886`
+
+Full-65 holdout station `108` headline result:
+
+- `era5_only`: `MAE 1.136`, `RMSE 1.422`, `R2 0.935`
+- `random_forest_grid_only`: `MAE 1.064`, `RMSE 1.293`, `R2 0.946`
+
+Current interpretation:
+
+- We now have a much more realistic January Stage-1 engineering dataset than the earlier `2`-station and `7`-station bootstrap versions.
+- The next high-value step is no longer more January station expansion, but extending this full station set from one month toward longer time coverage.
   - `ndvi`
   - `solar_incoming_j_m2_day`
   - `solar_incoming_w_m2`

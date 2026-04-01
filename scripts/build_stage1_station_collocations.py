@@ -42,8 +42,7 @@ def target_rowcol(lst_day_path: Path, lon: float, lat: float) -> tuple[int, int]
         return int(row), int(col)
 
 
-def sample_npz(npz_path: Path, row: int, col: int) -> dict:
-    data = np.load(npz_path)
+def sample_npz_loaded(data, row: int, col: int) -> dict:
     out = {}
     for key in data.files:
         value = data[key]
@@ -53,6 +52,11 @@ def sample_npz(npz_path: Path, row: int, col: int) -> dict:
         else:
             out[key] = None if not np.isfinite(item) else float(item)
     return out
+
+
+def sample_npz(npz_path: Path, row: int, col: int) -> dict:
+    data = np.load(npz_path)
+    return sample_npz_loaded(data, row, col)
 
 
 def coerce_float(text: str) -> float | None:
@@ -73,39 +77,56 @@ def build_records(
     features_dir: Path,
     daily_dir: Path,
 ) -> list[dict]:
-    station_lookup = {(row["source"], row["station_id"]): row for rows in station_tables.values() for row in rows}
-    records = []
+    day_dirs = sorted(path for path in daily_dir.iterdir() if path.is_dir())
+    if not day_dirs:
+        raise RuntimeError(f"No daily directories found in {daily_dir}")
+    reference_lst_day_path = next(day_dirs[0].glob("*_lst_day_c.tif"))
+
+    pixel_lookup: dict[tuple[str, str], tuple[int, int]] = {}
+    meta_lookup: dict[tuple[str, str], dict] = {}
+    rows_by_source_station: dict[tuple[str, str], list[dict]] = {}
+    rows_by_day: dict[str, list[tuple[dict, dict]]] = {}
 
     for meta in metadata_rows:
-        source = meta["source"]
-        station_id = meta["station_id"]
-        if source not in station_tables:
-            continue
-        rows = station_tables[source]
-        lon = float(meta["longitude"])
-        lat = float(meta["latitude"])
+        key = (meta["source"], meta["station_id"])
+        meta_lookup[key] = meta
+        pixel_lookup[key] = target_rowcol(reference_lst_day_path, float(meta["longitude"]), float(meta["latitude"]))
 
+    for rows in station_tables.values():
         for row in rows:
-            if row["station_id"] != station_id:
-                continue
+            key = (row["source"], row["station_id"])
+            rows_by_source_station.setdefault(key, []).append(row)
 
+    for key, rows in rows_by_source_station.items():
+        if key not in meta_lookup:
+            continue
+        meta = meta_lookup[key]
+        for row in rows:
             modis_day = date_to_modis_day(row["date"])
-            npz_path = features_dir / f"{modis_day}.npz"
-            day_dir = daily_dir / modis_day
-            if not npz_path.exists() or not day_dir.exists():
-                continue
+            rows_by_day.setdefault(modis_day, []).append((meta, row))
 
-            lst_day_path = next(day_dir.glob("*_lst_day_c.tif"))
-            px_row, px_col = target_rowcol(lst_day_path, lon, lat)
-            features = sample_npz(npz_path, px_row, px_col)
+    records = []
+
+    for modis_day in sorted(rows_by_day.keys()):
+        npz_path = features_dir / f"{modis_day}.npz"
+        day_dir = daily_dir / modis_day
+        if not npz_path.exists() or not day_dir.exists():
+            continue
+        data = np.load(npz_path)
+
+        for meta, row in rows_by_day[modis_day]:
+            source = meta["source"]
+            station_id = meta["station_id"]
+            px_row, px_col = pixel_lookup[(source, station_id)]
+            features = sample_npz_loaded(data, px_row, px_col)
             record = {
                 "source": source,
                 "station_id": station_id,
                 "station_name_ko": meta["station_name_ko"],
                 "date": row["date"],
                 "modis_day": modis_day,
-                "latitude": lat,
-                "longitude": lon,
+                "latitude": float(meta["latitude"]),
+                "longitude": float(meta["longitude"]),
                 "elevation_m": float(meta["elevation_m"]) if meta["elevation_m"] else None,
                 "pixel_row": px_row,
                 "pixel_col": px_col,
@@ -137,6 +158,8 @@ def main() -> None:
     parser.add_argument("--asos", default="25to1/data/stage1/processed/stations/SURFACE_ASOS_100_DAY_2018_2018_2019_normalized.csv")
     parser.add_argument("--aws", default="25to1/data/stage1/processed/stations/SURFACE_AWS_116_DAY_2018_2018_2019_normalized.csv")
     parser.add_argument("--station-csvs", nargs="*", default=None, help="Optional explicit list of normalized station CSV files.")
+    parser.add_argument("--station-csv-dir", default=None, help="Optional directory containing normalized station CSV files.")
+    parser.add_argument("--station-csv-glob", default="*_normalized.csv", help="Glob used with --station-csv-dir.")
     parser.add_argument("--features-dir", default="25to1/data/stage1/processed/stage1_simplified_features")
     parser.add_argument("--daily-dir", default="25to1/data/stage1/interim/mod11a1_daily")
     parser.add_argument("--output-dir", default="25to1/data/stage1/processed/station_collocations")
@@ -145,6 +168,8 @@ def main() -> None:
     metadata_rows = load_station_metadata(Path(args.station_meta).resolve())
     if args.station_csvs:
         station_paths = [Path(item).resolve() for item in args.station_csvs]
+    elif args.station_csv_dir:
+        station_paths = sorted(Path(args.station_csv_dir).resolve().glob(args.station_csv_glob))
     else:
         station_paths = [Path(args.asos).resolve(), Path(args.aws).resolve()]
     station_tables = load_station_rows_from_paths(station_paths)
