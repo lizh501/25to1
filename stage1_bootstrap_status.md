@@ -735,3 +735,36 @@ Interpretation:
 - We now have a concrete, date-split Stage-1 patch manifest rather than only daily rasters.
 - This is enough to move on to a first real Stage-1 super-resolution training dataloader without redoing data preparation.
 - Some cloud-heavy days naturally contribute zero patches under the current `50%` valid-label threshold, which is expected and consistent with the paper's missing-label challenge.
+
+## Update 2026-04-01: first Stage-1 patch CNN sanity training completed
+
+We then trained the first end-to-end Stage-1 patch-level CNN sanity baseline on the bootstrap patch dataset.
+
+Added script:
+
+- `25to1/scripts/train_stage1_patch_cnn.py`
+
+Training artifacts:
+
+- `25to1/data/stage1/models/stage1_patch_cnn_q1_ps64_s64_v50/best_model.pt`
+- `25to1/data/stage1/models/stage1_patch_cnn_q1_ps64_s64_v50/training_summary.json`
+- `25to1/stage1_patch_training_results.md`
+
+Run configuration:
+
+- device: `cuda`
+- epochs: `2`
+- batch size: `16`
+- train patches: `1325`
+- test patches: `807`
+
+Headline sanity-check result:
+
+- epoch 1 test: `MAE 0.241`, `RMSE 0.325`
+- epoch 2 test: `MAE 0.173`, `RMSE 0.245`
+
+Current interpretation:
+
+- The Stage-1 patch dataloader, mask-aware loss, patch sampling, and checkpoint pipeline are now fully runnable.
+- This is an engineering milestone, not yet a strict paper-level reproduction result.
+- The current patch labels are generated from a bootstrap surrogate trained on the full `Q1` collocation set, so these patch metrics should be treated as pipeline-validation metrics rather than leakage-free benchmark numbers.
