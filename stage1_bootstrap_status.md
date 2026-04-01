@@ -554,3 +554,88 @@ Current interpretation:
 - The Stage-1 bootstrap dataset is no longer January-only; it now supports a basic cross-month test.
 - Extending from January to February improves confidence that the current feature stack generalizes beyond a single-month engineering sandbox.
 - The next meaningful gain is to continue extending time coverage toward `2018 Q1` or full-year `2018`, then move from the station bootstrap target toward the paper's actual `MODIS-derived air temperature` label construction.
+
+## Update 2026-04-01: March 2018 extension completed
+
+Extended Stage-1 gridded inputs from January-February into full `2018 Q1`:
+
+- downloaded `MOD11A1` for `A2018060` to `A2018090`
+- downloaded `ERA5 daily T2M` for `2018-03`
+- downloaded `ERA5 daily SSRD` for `2018-03`
+- downloaded `MOD13A2` composites needed for March carry-over
+
+New or updated artifacts:
+
+- `25to1/data/stage1/raw/era5_daily/era5_daily_t2m_2018_03.nc`
+- `25to1/data/stage1/raw/solar_radiation/era5_daily_ssrd_2018_03.nc`
+- `25to1/data/stage1/interim/mod11a1_2018_03_manifest.json`
+- `25to1/data/stage1/interim/mod13a2_2018_03_04_manifest.json`
+- `25to1/data/stage1/processed/ndvi_composites/manifest.json`
+
+Completed March daily MOD11A1 mosaics:
+
+- `25to1/data/stage1/interim/mod11a1_daily/A2018060`
+- ...
+- `25to1/data/stage1/interim/mod11a1_daily/A2018090`
+
+Completed Q1 simplified feature stacks:
+
+- standard day-count: `90`
+- coverage: `2018-01-01` to `2018-03-31`
+- directory: `25to1/data/stage1/processed/stage1_simplified_features`
+
+March NDVI composite coverage added:
+
+- `A2018065`
+- `A2018081`
+
+Feature-pipeline script improvements:
+
+- `25to1/scripts/augment_stage1_features_with_solar_radiation.py`
+  - now copies loaded arrays before overwrite on Windows
+  - now writes through a temporary `.npz` and atomically replaces the target file
+  - this fixes intermittent `PermissionError` failures during in-place `npz` updates
+
+Rebuilt feature augmentations across the full Q1 set:
+
+- `ndvi` now available for all `90` standard daily `npz`
+- `solar_incoming_j_m2_day` now available for all `90` standard daily `npz`
+- `solar_incoming_w_m2` now available for all `90` standard daily `npz`
+
+Built Q1 full-65 collocations:
+
+- `25to1/data/stage1/processed/station_collocations_full65_q1/stage1_station_collocations_2018_01.csv`
+- `25to1/data/stage1/processed/station_collocations_full65_q1/stage1_station_collocations_2018_01_summary.json`
+
+Important note:
+
+- the above collocation file name still carries the historical `2018_01` suffix, but the actual content spans `2018-01-01` to `2018-03-31`
+
+Q1 collocation summary:
+
+- rows: `5850`
+- date range: `2018-01-01` to `2018-03-31`
+- station count: `65`
+
+Built Jan-Feb-train / March-test baseline outputs:
+
+- `25to1/data/stage1/models/station_baseline_full65_q1/time_split_janfeb_train_mar_test`
+- `25to1/data/stage1/models/station_baseline_full65_q1/holdout_station_108`
+
+Jan-Feb-train / March-test headline result:
+
+- `era5_only`: `MAE 1.409`, `RMSE 1.816`, `R2 0.853`
+- `linear_regression`: `MAE 1.456`, `RMSE 1.913`, `R2 0.837`
+- `linear_regression_grid_only`: `MAE 1.461`, `RMSE 1.921`, `R2 0.835`
+
+Q1 holdout station `108` headline result:
+
+- `era5_only`: `MAE 0.999`, `RMSE 1.280`, `R2 0.968`
+- `linear_regression`: `MAE 0.874`, `RMSE 1.136`, `R2 0.975`
+- `linear_regression_grid_only`: `MAE 0.951`, `RMSE 1.192`, `R2 0.972`
+
+Current interpretation:
+
+- We now have a complete Q1 engineering dataset for the Stage-1 bootstrap target.
+- The cross-month result is harder in March than in February, and the simple linear baseline no longer beats raw `ERA5` on the March holdout month.
+- That behavior is useful: it suggests Q1 is already exposing seasonal shift, which is exactly the kind of signal we want before moving on to the paper's true label-construction stage.

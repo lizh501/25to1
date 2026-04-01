@@ -1,4 +1,5 @@
 import argparse
+import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -99,6 +100,12 @@ def target_grid_from_lst(day_path: Path):
         return ds.crs, ds.transform, ds.height, ds.width
 
 
+def save_npz_atomic(path: Path, **payload) -> None:
+    tmp_path = path.with_name(path.name + ".tmp.npz")
+    np.savez_compressed(tmp_path, **payload)
+    os.replace(tmp_path, path)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Add incoming solar radiation features to Stage-1 daily npz stacks.")
     parser.add_argument("--features-dir", default="25to1/data/stage1/processed/stage1_simplified_features")
@@ -148,14 +155,15 @@ def main() -> None:
         )
         solar_w_m2_mean = solar_j_m2_day / 86400.0
 
-        old = np.load(npz_path)
-        if args.skip_existing and "solar_incoming_j_m2_day" in old.files and "solar_incoming_w_m2" in old.files:
-            print(f"SKIP {day}: existing solar fields")
-            continue
-        payload = {key: old[key] for key in old.files}
+        with np.load(npz_path) as old:
+            if args.skip_existing and "solar_incoming_j_m2_day" in old.files and "solar_incoming_w_m2" in old.files:
+                print(f"SKIP {day}: existing solar fields")
+                continue
+            # Copy arrays into memory before overwriting the same npz on Windows.
+            payload = {key: old[key].copy() for key in old.files}
         payload["solar_incoming_j_m2_day"] = solar_j_m2_day.astype(np.float32)
         payload["solar_incoming_w_m2"] = solar_w_m2_mean.astype(np.float32)
-        np.savez_compressed(npz_path, **payload)
+        save_npz_atomic(npz_path, **payload)
         updated += 1
         print(
             f"UPDATED {day}: "

@@ -323,3 +323,70 @@ Interpretation:
 
 - On the larger two-month set, the `linear_regression` baseline is currently the cleanest and most stable simple baseline for this bootstrap target.
 - The spatial holdout result remains strong enough to justify continuing time expansion before spending effort on heavier model tuning.
+
+## Update 2026-04-01: Q1 full-65 extension
+
+We then extended the full-65 station bootstrap from January-February into full `2018 Q1`.
+
+Extended artifacts:
+
+- `25to1/data/stage1/processed/station_collocations_full65_q1/stage1_station_collocations_2018_01.csv`
+- `25to1/data/stage1/processed/station_collocations_full65_q1/stage1_station_collocations_2018_01_summary.json`
+- `25to1/data/stage1/models/station_baseline_full65_q1/time_split_janfeb_train_mar_test/metrics_summary.json`
+- `25to1/data/stage1/models/station_baseline_full65_q1/holdout_station_108/metrics_summary.json`
+
+Important note:
+
+- the collocation file name still keeps the legacy `2018_01` suffix, but the actual content spans `2018-01-01` to `2018-03-31`
+
+Expanded collocation summary:
+
+- rows: `5850`
+- date range: `2018-01-01` to `2018-03-31`
+- station count: `65`
+
+### Jan-Feb-train / March-test time split
+
+Experiment:
+
+- train dates: `2018-01-01` to `2018-02-28`
+- test dates: `2018-03-01` to `2018-03-31`
+- train rows: `3830`
+- test rows: `2015`
+- output dir: `25to1/data/stage1/models/station_baseline_full65_q1/time_split_janfeb_train_mar_test`
+
+Metrics:
+
+- `era5_only`: `MAE 1.409`, `RMSE 1.816`, `R2 0.853`
+- `linear_regression`: `MAE 1.456`, `RMSE 1.913`, `R2 0.837`
+- `random_forest`: `MAE 1.820`, `RMSE 2.396`, `R2 0.744`
+- `linear_regression_grid_only`: `MAE 1.461`, `RMSE 1.921`, `R2 0.835`
+- `random_forest_grid_only`: `MAE 1.832`, `RMSE 2.415`, `R2 0.740`
+
+Interpretation:
+
+- March is a meaningfully harder holdout month than February for the current bootstrap target.
+- On this Q1 temporal split, raw `ERA5` is currently the strongest of the simple baselines.
+- This is not a failure of the pipeline; it is a useful sign that the current station-bootstrap target and simple feature relationships are not yet robust to a stronger seasonal shift.
+
+### Q1 holdout check for station 108
+
+Experiment:
+
+- holdout station: `108`
+- train rows: `5755`
+- test rows: `90`
+- output dir: `25to1/data/stage1/models/station_baseline_full65_q1/holdout_station_108`
+
+Metrics:
+
+- `era5_only`: `MAE 0.999`, `RMSE 1.280`, `R2 0.968`
+- `linear_regression`: `MAE 0.874`, `RMSE 1.136`, `R2 0.975`
+- `random_forest`: `MAE 1.014`, `RMSE 1.251`, `R2 0.970`
+- `linear_regression_grid_only`: `MAE 0.951`, `RMSE 1.192`, `R2 0.972`
+- `random_forest_grid_only`: `MAE 1.013`, `RMSE 1.245`, `R2 0.970`
+
+Interpretation:
+
+- Spatial holdout remains strong on the larger Q1 set, especially for the linear baseline.
+- The contrast between good spatial holdout and weaker March temporal holdout suggests that time generalization is now the clearer bottleneck than station coverage.
