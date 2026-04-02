@@ -234,3 +234,109 @@ So the most valuable next step is probably:
 3. rerun `se_srcnn` vs `sr_weather_like`
 
 That would be a much fairer test of the actual paper idea.
+
+## 10. Update: first SCM bootstrap experiments
+
+That SCM step has now been explored in two bootstrap forms.
+
+Added scripts:
+
+- `25to1/scripts/build_stage1_scm_bootstrap.py`
+- `25to1/scripts/augment_stage1_features_with_scm.py`
+
+### 10.1 Monthly SCM bootstrap
+
+First attempt:
+
+- source pseudo-labels:
+  - `25to1/data/stage1/processed/modis_at_bootstrap_q1_janfebtrain`
+- monthly SCM outputs:
+  - `25to1/data/stage1/processed/scm_bootstrap_q1_janfebtrain/manifest.json`
+
+Monthly means:
+
+- `2018-01`: `-4.92 C`
+- `2018-02`: `-2.90 C`
+- `2018-03`: `6.64 C`
+
+This version was too coarse: it effectively gave the network only three month-level constant climatology fields.
+
+Split-aware epoch-2 test RMSE with monthly SCM:
+
+- `srcnn_like`: `0.342`
+- `se_srcnn`: `0.335`
+- `sr_weather_like`: `0.400`
+
+Interpretation:
+
+- monthly SCM did not help
+- it made every model worse than the no-SCM split-aware baseline
+
+### 10.2 Rolling-15-day SCM bootstrap
+
+We then replaced the month-constant SCM with a rolling daily SCM approximation:
+
+- rolling SCM outputs:
+  - `25to1/data/stage1/processed/scm_bootstrap_q1_janfebtrain_rolling15/manifest.json`
+- window:
+  - `15` days centered on each day when available
+
+This gives a much more continuous seasonal field across `Q1`.
+
+Examples:
+
+- `A2018001`: mean `-3.11 C`
+- `A2018032`: mean `-7.36 C`
+- `A2018065`: mean `4.10 C`
+- `A2018090`: mean `10.10 C`
+
+Split-aware epoch-2 test RMSE with rolling-15-day SCM:
+
+- `srcnn_like`: `0.321`
+- `se_srcnn`: `0.322`
+- `sr_weather_like`: `0.335`
+
+### 10.3 Comparison across SCM variants
+
+No SCM, split-aware:
+
+- `srcnn_like`: `0.294`
+- `se_srcnn`: `0.339`
+- `sr_weather_like`: `0.317`
+
+Monthly SCM:
+
+- `srcnn_like`: `0.342`
+- `se_srcnn`: `0.335`
+- `sr_weather_like`: `0.400`
+
+Rolling-15-day SCM:
+
+- `srcnn_like`: `0.321`
+- `se_srcnn`: `0.322`
+- `sr_weather_like`: `0.335`
+
+### 10.4 Interpretation
+
+- The monthly SCM approximation was too crude and clearly harmful.
+- The rolling-15-day SCM is materially better than monthly SCM and improves the SCM experiments noticeably.
+- However, even the rolling SCM still does not beat the best no-SCM `srcnn_like` baseline.
+- The `se_srcnn` model benefits more from rolling SCM than it did from no SCM, but the `sr_weather_like` model still does not unlock the paper-style gain.
+
+### 10.5 What this likely means
+
+The result is informative rather than discouraging:
+
+- the paper's `SCM` probably carries richer seasonal-spatial structure than our current bootstrap proxy
+- our current bootstrap SCM is still closer to a smoothed pseudo-label climatology than to the paper's intended seasonal climatology map
+- architectural changes alone are not enough; the quality of `SCM` matters a lot
+
+## 11. Updated next step
+
+The next high-value move is now clearer:
+
+1. build a better SCM approximation than the current rolling pseudo-label mean
+2. preferably derive it from a longer temporal baseline than `Q1` alone
+3. then rerun the same three-model comparison
+
+That is now more valuable than adding still more CNN complexity.

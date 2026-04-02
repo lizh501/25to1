@@ -20,6 +20,7 @@ PATCH_FEATURES = [
     "lst_day_c",
     "lst_night_c",
     "lst_mean_c",
+    "scm_bootstrap_c",
     "ndvi",
     "solar_incoming_w_m2",
     "valid_day",
@@ -29,12 +30,7 @@ PATCH_FEATURES = [
 INPUT_FEATURES = PATCH_FEATURES + ["aspect_sin", "aspect_cos"]
 STATIC_LIKE_FEATURES = [
     "dem_m",
-    "slope_deg",
-    "imp_proxy",
-    "lc_type1_majority",
-    "ndvi",
-    "aspect_sin",
-    "aspect_cos",
+    "scm_bootstrap_c",
 ]
 
 
@@ -56,7 +52,7 @@ def masked_metrics(pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor)
 
 def normalize_feature(name: str, arr: np.ndarray) -> np.ndarray:
     out = arr.astype(np.float32, copy=True)
-    if name in {"era5_t2m_c", "lst_day_c", "lst_night_c", "lst_mean_c"}:
+    if name in {"era5_t2m_c", "lst_day_c", "lst_night_c", "lst_mean_c", "scm_bootstrap_c"}:
         out = np.clip(out, -40.0, 50.0) / 20.0
     elif name == "dem_m":
         out[out <= -10000.0] = np.nan

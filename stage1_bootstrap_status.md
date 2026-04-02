@@ -839,3 +839,57 @@ Current interpretation:
 - In the current bootstrap setting, the simplest `srcnn_like` baseline still performs best.
 - The `sr_weather_like` model is already better than `se_srcnn`, which is a useful early sign that the paper-inspired pooling/gating idea may help once the right inputs are present.
 - The next meaningful upgrade is likely to come from adding a first `SCM` approximation rather than only tuning network depth.
+
+## Update 2026-04-02: bootstrap SCM experiments completed
+
+We then added the first `SCM` bootstrap approximations and reran the patch-training comparison.
+
+Added scripts:
+
+- `25to1/scripts/build_stage1_scm_bootstrap.py`
+- `25to1/scripts/augment_stage1_features_with_scm.py`
+
+Two SCM variants were tested:
+
+1. monthly SCM
+2. rolling `15`-day SCM
+
+SCM artifacts:
+
+- monthly SCM:
+  - `25to1/data/stage1/processed/scm_bootstrap_q1_janfebtrain/manifest.json`
+- rolling SCM:
+  - `25to1/data/stage1/processed/scm_bootstrap_q1_janfebtrain_rolling15/manifest.json`
+
+Monthly SCM summary:
+
+- `2018-01`: mean `-4.92 C`
+- `2018-02`: mean `-2.90 C`
+- `2018-03`: mean `6.64 C`
+
+Rolling `15`-day SCM summary:
+
+- generated one SCM raster per day
+- day-level mean fields vary smoothly across `Q1`
+
+Epoch-2 split-aware test RMSE comparison:
+
+- no SCM:
+  - `srcnn_like`: `0.294`
+  - `se_srcnn`: `0.339`
+  - `sr_weather_like`: `0.317`
+- monthly SCM:
+  - `srcnn_like`: `0.342`
+  - `se_srcnn`: `0.335`
+  - `sr_weather_like`: `0.400`
+- rolling `15`-day SCM:
+  - `srcnn_like`: `0.321`
+  - `se_srcnn`: `0.322`
+  - `sr_weather_like`: `0.335`
+
+Current interpretation:
+
+- The monthly SCM proxy was too coarse and clearly harmful.
+- The rolling SCM is substantially better than monthly SCM and is directionally more reasonable.
+- Even so, the current bootstrap SCM still does not beat the best no-SCM baseline, which suggests the paper's true SCM signal is richer than our current proxy.
+- This pushes the next priority toward a better SCM construction rather than more architecture tinkering.
