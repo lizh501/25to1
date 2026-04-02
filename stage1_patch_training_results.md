@@ -340,3 +340,67 @@ The next high-value move is now clearer:
 3. then rerun the same three-model comparison
 
 That is now more valuable than adding still more CNN complexity.
+
+## 12. Update: SCM anomaly experiment
+
+We also tested a more paper-inspired SCM proxy: instead of averaging the pseudo-label temperature field itself, we first removed the coarse `ERA5` background and then built a rolling climatology of the remaining anomaly.
+
+Added script:
+
+- `25to1/scripts/build_stage1_scm_anomaly_bootstrap.py`
+
+Artifacts:
+
+- anomaly SCM manifest:
+  - `25to1/data/stage1/processed/scm_bootstrap_anom_q1_janfebtrain_rolling15/manifest.json`
+
+Design:
+
+- source field:
+  - `bootstrap_MODIS_AT - ERA5_T2M`
+- smoothing:
+  - rolling `15`-day window
+
+### 12.1 Result of the anomaly SCM itself
+
+This anomaly field turned out to be much flatter than expected.
+
+Examples:
+
+- `A2018001`: mean anomaly `-1.44 C`
+- `A2018032`: mean anomaly `-1.45 C`
+- `A2018090`: mean anomaly `-1.82 C`
+
+That means the current anomaly SCM is close to a weak, nearly constant bias field rather than a rich spatial seasonal prior.
+
+### 12.2 Patch-model results with anomaly SCM
+
+Epoch-2 split-aware test RMSE:
+
+- `srcnn_like`: `0.369`
+- `sr_weather_like`: `0.335`
+
+Relevant training summaries:
+
+- `25to1/data/stage1/models/stage1_patch_cnn_scmanomroll15_q1_janfebtrain_ps64_s64_v50/training_summary.json`
+- `25to1/data/stage1/models/stage1_patch_sr_weather_like_scmanomroll15_q1_janfebtrain_ps64_s64_v50/training_summary.json`
+
+### 12.3 Interpretation
+
+- The anomaly SCM did not help.
+- It was worse than the rolling temperature-field SCM and also worse than the no-SCM baseline.
+- This suggests that with only the current `Q1` bootstrap pseudo-labels, subtracting `ERA5` removes too much of the useful structure and leaves a prior that is too weak.
+
+## 13. Practical conclusion
+
+At this point, the experimental picture is pretty consistent:
+
+- no SCM is currently best
+- rolling temperature-field SCM is the least bad SCM proxy so far
+- monthly SCM is too coarse
+- anomaly SCM is too weak
+
+So the bottleneck is no longer ambiguous:
+
+- we need a **better temporal basis for SCM construction**
+- most likely that means **more months of data**, not another quick SCM formula tweak

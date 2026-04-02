@@ -893,3 +893,36 @@ Current interpretation:
 - The rolling SCM is substantially better than monthly SCM and is directionally more reasonable.
 - Even so, the current bootstrap SCM still does not beat the best no-SCM baseline, which suggests the paper's true SCM signal is richer than our current proxy.
 - This pushes the next priority toward a better SCM construction rather than more architecture tinkering.
+
+## Update 2026-04-02: SCM anomaly experiment completed
+
+We then tested a more paper-like SCM proxy based on spatial anomaly rather than direct temperature climatology.
+
+Added script:
+
+- `25to1/scripts/build_stage1_scm_anomaly_bootstrap.py`
+
+Experiment design:
+
+- first compute `bootstrap_MODIS_AT - ERA5_T2M`
+- then build a rolling `15`-day climatology of that anomaly field
+
+Artifact:
+
+- `25to1/data/stage1/processed/scm_bootstrap_anom_q1_janfebtrain_rolling15/manifest.json`
+
+Observed SCM-anomaly behavior:
+
+- the resulting anomaly field was much flatter than expected
+- example day means stayed close to about `-1.4 C` to `-1.8 C` across the season
+
+Patch-model effect:
+
+- `srcnn_like` with anomaly SCM: `RMSE 0.369`
+- `sr_weather_like` with anomaly SCM: `RMSE 0.335`
+
+Current interpretation:
+
+- The anomaly SCM is worse than the rolling temperature-field SCM and also worse than the best no-SCM baseline.
+- This strongly suggests the current `Q1` bootstrap dataset is too short to support a really useful SCM approximation.
+- The next high-value gain is now much more likely to come from extending the time span of the dataset than from trying more quick SCM formulas.
