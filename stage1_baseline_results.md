@@ -390,3 +390,72 @@ Interpretation:
 
 - Spatial holdout remains strong on the larger Q1 set, especially for the linear baseline.
 - The contrast between good spatial holdout and weaker March temporal holdout suggests that time generalization is now the clearer bottleneck than station coverage.
+
+## Update 2026-04-02: January-April full-65 extension
+
+We then extended the same full-65 station bootstrap into `2018-04`.
+
+Extended artifacts:
+
+- `25to1/data/stage1/processed/station_collocations_full65_q1apr/stage1_station_collocations_2018_01.csv`
+- `25to1/data/stage1/processed/station_collocations_full65_q1apr/stage1_station_collocations_2018_01_summary.json`
+- `25to1/data/stage1/models/station_baseline_full65_q1apr/time_split_janmar_train_apr_test/metrics_summary.json`
+- `25to1/data/stage1/models/station_baseline_full65_q1apr/holdout_station_108/metrics_summary.json`
+
+Important note:
+
+- the collocation file name still keeps the legacy `2018_01` suffix
+- the actual content now spans `2018-01-01` to `2018-04-30`
+
+Expanded collocation summary:
+
+- rows: `7800`
+- date range: `2018-01-01` to `2018-04-30`
+- station count: `65`
+
+### Jan-Mar-train / April-test time split
+
+Experiment:
+
+- train dates: `2018-01-01` to `2018-03-31`
+- test dates: `2018-04-01` to `2018-04-30`
+- train rows: `5845`
+- test rows: `1948`
+- output dir: `25to1/data/stage1/models/station_baseline_full65_q1apr/time_split_janmar_train_apr_test`
+
+Metrics:
+
+- `era5_only`: `MAE 1.298`, `RMSE 1.697`, `R2 0.835`
+- `linear_regression`: `MAE 1.244`, `RMSE 1.663`, `R2 0.842`
+- `random_forest`: `MAE 1.413`, `RMSE 1.824`, `R2 0.810`
+- `linear_regression_grid_only`: `MAE 1.258`, `RMSE 1.682`, `R2 0.838`
+- `random_forest_grid_only`: `MAE 1.414`, `RMSE 1.826`, `R2 0.809`
+
+Interpretation:
+
+- April is still a real temporal holdout, but it is less hostile than March was under the earlier `Jan-Feb -> Mar` split.
+- The linear baseline is again slightly better than raw `ERA5`, which is a useful sign that the expanded four-month feature stack is becoming more stable.
+- The random-forest baselines remain less reliable than the linear model on this temporal split.
+
+### January-April holdout check for station 108
+
+Experiment:
+
+- holdout station: `108`
+- train rows: `7673`
+- test rows: `120`
+- output dir: `25to1/data/stage1/models/station_baseline_full65_q1apr/holdout_station_108`
+
+Metrics:
+
+- `era5_only`: `MAE 1.004`, `RMSE 1.260`, `R2 0.977`
+- `linear_regression`: `MAE 0.811`, `RMSE 1.077`, `R2 0.983`
+- `random_forest`: `MAE 0.943`, `RMSE 1.190`, `R2 0.980`
+- `linear_regression_grid_only`: `MAE 0.867`, `RMSE 1.121`, `R2 0.982`
+- `random_forest_grid_only`: `MAE 0.943`, `RMSE 1.188`, `R2 0.980`
+
+Interpretation:
+
+- Spatial holdout remains very strong after extending to four months.
+- The linear baseline is still the cleanest simple model in this bootstrap setting.
+- The main remaining uncertainty is no longer whether the feature stack is useful, but how much of that signal can transfer into the Stage-1 image-to-image training setup.

@@ -926,3 +926,61 @@ Current interpretation:
 - The anomaly SCM is worse than the rolling temperature-field SCM and also worse than the best no-SCM baseline.
 - This strongly suggests the current `Q1` bootstrap dataset is too short to support a really useful SCM approximation.
 - The next high-value gain is now much more likely to come from extending the time span of the dataset than from trying more quick SCM formulas.
+
+## Update 2026-04-02: Stage-1 extended from Q1 to January-April
+
+We then extended the Stage-1 bootstrap dataset from full `Q1` into full `2018-04`.
+
+New raw-data artifacts:
+
+- `25to1/data/stage1/interim/mod11a1_2018_04_manifest.json`
+- `25to1/data/stage1/interim/mod13a2_2018_04_05_manifest.json`
+- `25to1/data/stage1/raw/era5_daily/era5_daily_t2m_2018_04.nc`
+- `25to1/data/stage1/raw/solar_radiation/era5_daily_ssrd_2018_04.nc`
+
+Updated processed artifacts:
+
+- `25to1/data/stage1/processed/stage1_simplified_features/manifest.json`
+- `25to1/data/stage1/processed/ndvi_composites/manifest.json`
+- `25to1/data/stage1/processed/station_collocations_full65_q1apr/stage1_station_collocations_2018_01.csv`
+- `25to1/data/stage1/processed/station_collocations_full65_q1apr/stage1_station_collocations_2018_01_summary.json`
+
+Current April-extension summary:
+
+- standard daily feature stacks now cover `A2018001` to `A2018120`
+- this corresponds to `2018-01-01` through `2018-04-30`
+- full-65 station collocations now reach `7800` rows across the four-month span
+
+Important naming note:
+
+- the collocation CSV still keeps the legacy file name `stage1_station_collocations_2018_01.csv`
+- its actual content now spans `2018-01-01` to `2018-04-30`
+
+## Update 2026-04-02: longer-baseline split-aware MODIS-AT bootstrap and SCM
+
+After extending to April, we rebuilt the split-aware pseudo-label chain using `Jan-Mar` station collocations as training data and applied it to the whole `Jan-Apr` daily stack.
+
+New pseudo-label artifacts:
+
+- `25to1/data/stage1/models/modis_at_bootstrap_q1apr_janmartrain/training_summary.json`
+- `25to1/data/stage1/processed/modis_at_bootstrap_q1apr_janmartrain/manifest.json`
+
+New rolling SCM artifacts:
+
+- `25to1/data/stage1/processed/scm_bootstrap_q1apr_janmartrain_rolling15/manifest.json`
+
+Updated patch-index artifact:
+
+- `25to1/data/stage1/processed/stage1_patch_index_q1apr_janmartrain_ps64_s64_v50/stage1_patch_index.csv`
+- `25to1/data/stage1/processed/stage1_patch_index_q1apr_janmartrain_ps64_s64_v50/stage1_patch_index_summary.json`
+
+Key summary:
+
+- pseudo-labels now cover `120` days
+- rolling `15`-day SCM now has a longer temporal basis than the previous `Q1` version
+- the new patch index contains both `Jan-Mar` train patches and `Apr` test patches under the same split-aware setup
+
+Current interpretation:
+
+- extending the time span did what we hoped at the data level: the SCM prior is no longer constrained to only `Q1`
+- this creates a better test bed for asking whether SR-Weather-style gating can benefit from SCM once the prior has a longer seasonal basis

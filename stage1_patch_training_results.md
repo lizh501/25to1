@@ -404,3 +404,76 @@ So the bottleneck is no longer ambiguous:
 
 - we need a **better temporal basis for SCM construction**
 - most likely that means **more months of data**, not another quick SCM formula tweak
+
+## 14. Update: January-April extension changed the SCM picture
+
+We then extended the split-aware pseudo-label and SCM pipeline from `Q1` into full `Jan-Apr`.
+
+New artifacts:
+
+- split-aware pseudo-label model:
+  - `25to1/data/stage1/models/modis_at_bootstrap_q1apr_janmartrain/training_summary.json`
+- Jan-Apr pseudo-label rasters:
+  - `25to1/data/stage1/processed/modis_at_bootstrap_q1apr_janmartrain/manifest.json`
+- longer-baseline rolling SCM:
+  - `25to1/data/stage1/processed/scm_bootstrap_q1apr_janmartrain_rolling15/manifest.json`
+- Jan-Mar-train / Apr-test patch index:
+  - `25to1/data/stage1/processed/stage1_patch_index_q1apr_janmartrain_ps64_s64_v50/stage1_patch_index.csv`
+  - `25to1/data/stage1/processed/stage1_patch_index_q1apr_janmartrain_ps64_s64_v50/stage1_patch_index_summary.json`
+
+Patch-index summary:
+
+- date range: `2018-01-01` to `2018-04-30`
+- split date: `2018-04-01`
+- train period: `Jan-Mar`
+- test period: `Apr`
+
+### 14.1 Quick patch runs with longer-baseline rolling SCM
+
+We reran the most informative pair of models:
+
+- `srcnn_like`
+- `sr_weather_like`
+
+Outputs:
+
+- `25to1/data/stage1/models/stage1_patch_cnn_scmroll15_q1apr_janmartrain_ps64_s64_v50/training_summary.json`
+- `25to1/data/stage1/models/stage1_patch_sr_weather_like_scmroll15_q1apr_janmartrain_ps64_s64_v50/training_summary.json`
+
+Epoch-2 April-holdout test metrics:
+
+- `srcnn_like`: `MAE 0.138`, `RMSE 0.190`
+- `sr_weather_like`: `MAE 0.157`, `RMSE 0.203`
+
+### 14.2 Comparison with the earlier Q1-only SCM results
+
+Earlier rolling-15-day SCM on the shorter `Q1` setup:
+
+- `srcnn_like`: `RMSE 0.321`
+- `sr_weather_like`: `RMSE 0.335`
+
+Now, with the Jan-Apr split-aware pseudo-label chain and longer-baseline rolling SCM:
+
+- `srcnn_like`: `RMSE 0.190`
+- `sr_weather_like`: `RMSE 0.203`
+
+### 14.3 Interpretation
+
+- This is the first strong sign that extending the time span was the right move.
+- The rolling SCM prior becomes much more usable once it is built from a longer temporal basis than `Q1` alone.
+- `srcnn_like` is still slightly better than `sr_weather_like`, so we do **not** yet have a paper-style architectural win.
+- But the gap is now much smaller, and the whole SCM-enabled setup is materially healthier than the earlier `Q1` experiments.
+
+## 15. Current practical conclusion
+
+The picture is more specific now:
+
+- the previous weak point was not just "SCM formula quality" in the abstract
+- it was also the fact that the SCM proxy was being estimated from too short a seasonal window
+- once the dataset extends into `April`, the rolling SCM prior starts to support much stronger patch-level performance
+
+So the next best move is no longer another quick bootstrap formula tweak. It is:
+
+1. continue extending the time span beyond `Jan-Apr`
+2. keep the split-aware pseudo-label generation strict
+3. rerun the same `srcnn_like vs sr_weather_like` comparison as the SCM prior becomes more climatological and less short-window-smoothed
