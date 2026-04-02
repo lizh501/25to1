@@ -802,3 +802,40 @@ Current interpretation:
 
 - The stricter split-aware result is worse than the earlier optimistic run, which is exactly what we would expect from a healthier evaluation setup.
 - This split-aware patch CNN is the more honest Stage-1 engineering baseline to build on from here.
+
+## Update 2026-04-02: first architecture comparison completed
+
+We then moved beyond the minimal patch CNN and compared three Stage-1 patch architectures on the same split-aware dataset.
+
+Updated script:
+
+- `25to1/scripts/train_stage1_patch_cnn.py`
+
+Newly supported architectures:
+
+- `srcnn_like`
+- `se_srcnn`
+- `sr_weather_like`
+
+Important scope note:
+
+- the current `sr_weather_like` is only a structural approximation of the paper idea
+- it still does **not** include a proper `SCM` input, so it should be treated as a partial architectural probe rather than a faithful SR-Weather reproduction
+
+Model outputs:
+
+- `25to1/data/stage1/models/stage1_patch_cnn_q1_janfebtrain_ps64_s64_v50/training_summary.json`
+- `25to1/data/stage1/models/stage1_patch_se_srcnn_q1_janfebtrain_ps64_s64_v50/training_summary.json`
+- `25to1/data/stage1/models/stage1_patch_sr_weather_like_q1_janfebtrain_ps64_s64_v50/training_summary.json`
+
+Epoch-2 test comparison on the split-aware patch set:
+
+- `srcnn_like`: `MAE 0.211`, `RMSE 0.294`
+- `se_srcnn`: `MAE 0.261`, `RMSE 0.339`
+- `sr_weather_like`: `MAE 0.229`, `RMSE 0.317`
+
+Current interpretation:
+
+- In the current bootstrap setting, the simplest `srcnn_like` baseline still performs best.
+- The `sr_weather_like` model is already better than `se_srcnn`, which is a useful early sign that the paper-inspired pooling/gating idea may help once the right inputs are present.
+- The next meaningful upgrade is likely to come from adding a first `SCM` approximation rather than only tuning network depth.

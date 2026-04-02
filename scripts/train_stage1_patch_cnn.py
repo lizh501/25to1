@@ -26,6 +26,16 @@ PATCH_FEATURES = [
     "valid_night",
     "valid_mean",
 ]
+INPUT_FEATURES = PATCH_FEATURES + ["aspect_sin", "aspect_cos"]
+STATIC_LIKE_FEATURES = [
+    "dem_m",
+    "slope_deg",
+    "imp_proxy",
+    "lc_type1_majority",
+    "ndvi",
+    "aspect_sin",
+    "aspect_cos",
+]
 
 
 def choose_device(device_arg: str) -> str:
@@ -155,6 +165,96 @@ class SRCNNLike(nn.Module):
         return residual + self.net(x)
 
 
+class SEBlock(nn.Module):
+    def __init__(self, channels: int, reduction: int = 8):
+        super().__init__()
+        hidden = max(channels // reduction, 8)
+        self.pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Conv2d(channels, hidden, kernel_size=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(hidden, channels, kernel_size=1),
+            nn.Sigmoid(),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        weight = self.fc(self.pool(x))
+        return x * weight
+
+
+class SESRCNN(nn.Module):
+    def __init__(self, in_channels: int):
+        super().__init__()
+        self.conv1 = nn.Conv2d(in_channels, 64, kernel_size=9, padding=4)
+        self.conv2 = nn.Conv2d(64, 32, kernel_size=5, padding=2)
+        self.se = SEBlock(32, reduction=8)
+        self.conv3 = nn.Conv2d(32, 1, kernel_size=5, padding=2)
+        self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        residual = x[:, 0:1, :, :] * 20.0
+        feat = self.relu(self.conv1(x))
+        feat = self.relu(self.conv2(feat))
+        feat = self.se(feat)
+        return residual + self.conv3(feat)
+
+
+class SRWeatherGate(nn.Module):
+    def __init__(self, feat_channels: int, all_channels: int, static_channels: int):
+        super().__init__()
+        hidden = max(feat_channels // 2, 16)
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.max_pool = nn.AdaptiveMaxPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(all_channels + 2 * static_channels, hidden),
+            nn.ReLU(inplace=True),
+            nn.Linear(hidden, feat_channels),
+            nn.Sigmoid(),
+        )
+
+    def forward(self, feat: torch.Tensor, all_inputs: torch.Tensor, static_inputs: torch.Tensor) -> torch.Tensor:
+        avg_desc = self.avg_pool(all_inputs).flatten(1)
+        max_desc = self.max_pool(static_inputs).flatten(1)
+        min_desc = -self.max_pool(-static_inputs).flatten(1)
+        desc = torch.cat([avg_desc, max_desc, min_desc], dim=1)
+        weight = self.fc(desc).unsqueeze(-1).unsqueeze(-1)
+        return feat * weight
+
+
+class SRWeatherLike(nn.Module):
+    def __init__(self, in_channels: int, static_indices: list[int]):
+        super().__init__()
+        self.static_indices = static_indices
+        self.conv1 = nn.Conv2d(in_channels, 64, kernel_size=9, padding=4)
+        self.conv2 = nn.Conv2d(64, 32, kernel_size=5, padding=2)
+        self.conv3 = nn.Conv2d(32, 1, kernel_size=5, padding=2)
+        self.relu = nn.ReLU(inplace=True)
+        self.gate = SRWeatherGate(
+            feat_channels=32,
+            all_channels=in_channels,
+            static_channels=len(static_indices),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        residual = x[:, 0:1, :, :] * 20.0
+        feat = self.relu(self.conv1(x))
+        feat = self.relu(self.conv2(feat))
+        static_inputs = x[:, self.static_indices, :, :]
+        feat = self.gate(feat, x, static_inputs)
+        return residual + self.conv3(feat)
+
+
+def build_model(architecture: str, in_channels: int) -> nn.Module:
+    if architecture == "srcnn_like":
+        return SRCNNLike(in_channels=in_channels)
+    if architecture == "se_srcnn":
+        return SESRCNN(in_channels=in_channels)
+    if architecture == "sr_weather_like":
+        static_indices = [INPUT_FEATURES.index(name) for name in STATIC_LIKE_FEATURES]
+        return SRWeatherLike(in_channels=in_channels, static_indices=static_indices)
+    raise ValueError(f"Unsupported architecture: {architecture}")
+
+
 def masked_l1_loss(pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
     valid = mask > 0.5
     if valid.sum().item() == 0:
@@ -207,6 +307,11 @@ def main() -> None:
         "--output-dir",
         default="25to1/data/stage1/models/stage1_patch_cnn_q1_ps64_s64_v50",
     )
+    parser.add_argument(
+        "--architecture",
+        choices=["srcnn_like", "se_srcnn", "sr_weather_like"],
+        default="srcnn_like",
+    )
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--lr", type=float, default=1e-3)
@@ -236,7 +341,8 @@ def main() -> None:
         num_workers=args.num_workers,
     )
 
-    model = SRCNNLike(in_channels=len(PATCH_FEATURES) + 2).to(device)
+    in_channels = len(INPUT_FEATURES)
+    model = build_model(args.architecture, in_channels=in_channels).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     history = []
@@ -260,14 +366,16 @@ def main() -> None:
             torch.save(
                 {
                     "model_state_dict": model.state_dict(),
-                    "in_channels": len(PATCH_FEATURES) + 2,
-                    "patch_features": PATCH_FEATURES + ["aspect_sin", "aspect_cos"],
+                    "architecture": args.architecture,
+                    "in_channels": in_channels,
+                    "patch_features": INPUT_FEATURES,
                 },
                 best_path,
             )
 
     summary = {
         "patch_index": str(patch_index),
+        "architecture": args.architecture,
         "device": device,
         "epochs": args.epochs,
         "batch_size": args.batch_size,

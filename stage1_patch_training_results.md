@@ -172,3 +172,65 @@ The next major upgrade should be one of:
 1. replace the current small CNN with a closer `SE-SRCNN` baseline
 2. add the paper-inspired pooling/attention modification toward `SR-Weather`
 3. improve the label-construction stage itself with a closer approximation to the paper's `MODIS-derived air temperature`
+
+## 9. Update: architecture comparison on the split-aware setup
+
+That next architecture step has now been started.
+
+We upgraded the training script so it can train three architectures from the same patch pipeline:
+
+- `srcnn_like`
+- `se_srcnn`
+- `sr_weather_like`
+
+Script:
+
+- `25to1/scripts/train_stage1_patch_cnn.py`
+
+Important scope note:
+
+- the current `sr_weather_like` is structurally inspired by the paper's three-branch pooling idea
+- it is **not** a full faithful SR-Weather implementation yet because we still do not have the paper-style `SCM` input in the patch stack
+
+### 9.1 Split-aware architecture results
+
+Patch source:
+
+- `25to1/data/stage1/processed/stage1_patch_index_q1_janfebtrain_ps64_s64_v50/stage1_patch_index.csv`
+
+Models:
+
+- `srcnn_like`:
+  - `25to1/data/stage1/models/stage1_patch_cnn_q1_janfebtrain_ps64_s64_v50/training_summary.json`
+- `se_srcnn`:
+  - `25to1/data/stage1/models/stage1_patch_se_srcnn_q1_janfebtrain_ps64_s64_v50/training_summary.json`
+- `sr_weather_like`:
+  - `25to1/data/stage1/models/stage1_patch_sr_weather_like_q1_janfebtrain_ps64_s64_v50/training_summary.json`
+
+Epoch-2 test results:
+
+- `srcnn_like`: `MAE 0.211`, `RMSE 0.294`
+- `se_srcnn`: `MAE 0.261`, `RMSE 0.339`
+- `sr_weather_like`: `MAE 0.229`, `RMSE 0.317`
+
+### 9.2 Interpretation
+
+- In the current bootstrap setting, the simple `srcnn_like` baseline is still the strongest of the three.
+- The `sr_weather_like` model does improve over `se_srcnn`, which is encouraging because it suggests the pooling-based gating idea is not useless even before `SCM` is available.
+- However, without the paper's `SCM` and without more careful tuning, the current `sr_weather_like` does not yet beat the simpler baseline.
+
+### 9.3 What this means
+
+At this point we have learned something useful:
+
+- the pipeline can support architecture comparison
+- the paper-inspired pooling change is directionally promising
+- the next real performance gain is more likely to come from better inputs and label construction than from blindly making the CNN fancier
+
+So the most valuable next step is probably:
+
+1. add a first `SCM` approximation
+2. inject that `SCM` into the patch pipeline
+3. rerun `se_srcnn` vs `sr_weather_like`
+
+That would be a much fairer test of the actual paper idea.
