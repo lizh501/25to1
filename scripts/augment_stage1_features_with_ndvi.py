@@ -1,6 +1,8 @@
 import argparse
 import json
+import os
 import re
+import time
 from datetime import datetime, date
 from pathlib import Path
 
@@ -65,11 +67,26 @@ def target_grid_from_lst(day_path: Path):
         return ds.crs, ds.transform, ds.height, ds.width
 
 
+def save_npz_atomic(path: Path, **payload) -> None:
+    tmp_path = path.with_name(path.name + ".tmp.npz")
+    np.savez_compressed(tmp_path, **payload)
+    last_error = None
+    for _ in range(10):
+        try:
+            os.replace(tmp_path, path)
+            return
+        except PermissionError as exc:
+            last_error = exc
+            time.sleep(0.5)
+    raise last_error
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Add NDVI to existing simplified Stage-1 feature stacks.")
     parser.add_argument("--features-dir", default="25to1/data/stage1/processed/stage1_simplified_features")
     parser.add_argument("--daily-dir", default="25to1/data/stage1/interim/mod11a1_daily")
     parser.add_argument("--ndvi-manifest", default="25to1/data/stage1/processed/ndvi_composites/manifest.json")
+    parser.add_argument("--start-day", default="", help="Optional start day like A2018146 for resume runs.")
     args = parser.parse_args()
 
     features_dir = Path(args.features_dir).resolve()
@@ -79,12 +96,15 @@ def main() -> None:
     data_root = ndvi_manifest_path.parents[3]
 
     updated = 0
+    failed = 0
     for npz_path in sorted(features_dir.glob("A*.npz")):
         if not DAY_NPZ_RE.match(npz_path.name):
             print(f"SKIP {npz_path.name}: non-standard filename")
             continue
 
         day = npz_path.stem
+        if args.start_day and day < args.start_day:
+            continue
         day_date = modis_day_to_date(day)
         ndvi_entry = find_ndvi_entry(ndvi_entries, day_date)
         if ndvi_entry is None:
@@ -110,14 +130,20 @@ def main() -> None:
                 resampling=Resampling.bilinear,
             )
 
-        old = np.load(npz_path)
-        payload = {key: old[key] for key in old.files}
+        with np.load(npz_path) as old:
+            # Copy arrays into memory before overwriting the same npz on Windows.
+            payload = {key: old[key].copy() for key in old.files}
         payload["ndvi"] = ndvi_resampled.astype(np.float32)
-        np.savez_compressed(npz_path, **payload)
+        try:
+            save_npz_atomic(npz_path, **payload)
+        except PermissionError as exc:
+            failed += 1
+            print(f"FAIL {day}: {exc}")
+            continue
         updated += 1
         print(f"UPDATED {day}: ndvi_mean={float(np.nanmean(ndvi_resampled)):.4f}")
 
-    print(f"Done. updated={updated}")
+    print(f"Done. updated={updated} failed={failed}")
 
 
 if __name__ == "__main__":

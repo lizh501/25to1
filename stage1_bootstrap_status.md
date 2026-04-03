@@ -984,3 +984,61 @@ Current interpretation:
 
 - extending the time span did what we hoped at the data level: the SCM prior is no longer constrained to only `Q1`
 - this creates a better test bed for asking whether SR-Weather-style gating can benefit from SCM once the prior has a longer seasonal basis
+
+## Update 2026-04-02: Stage-1 extended to 2018 H1
+
+We then continued from `Jan-Apr` to full `2018 H1`, meaning `2018-01-01` through `2018-06-30`.
+
+New raw-data artifacts:
+
+- `25to1/data/stage1/interim/mod11a1_2018_05_06_manifest.json`
+- `25to1/data/stage1/interim/mod13a2_2018_05_06_manifest.json`
+- `25to1/data/stage1/raw/era5_daily/era5_daily_t2m_2018_5-6.nc`
+- `25to1/data/stage1/raw/solar_radiation/era5_daily_ssrd_2018_5-6.nc`
+
+Updated processed artifacts:
+
+- `25to1/data/stage1/processed/stage1_simplified_features/manifest.json`
+- `25to1/data/stage1/processed/ndvi_composites/manifest.json`
+- `25to1/data/stage1/processed/station_collocations_full65_h1/stage1_station_collocations_2018_01.csv`
+- `25to1/data/stage1/processed/station_collocations_full65_h1/stage1_station_collocations_2018_01_summary.json`
+
+Current H1 summary:
+
+- daily Stage-1 feature stacks now cover `A2018001` to `A2018181`
+- this corresponds to `2018-01-01` through `2018-06-30`
+- full-65 station collocations now reach `11765` rows across the six-month span
+
+Important implementation note:
+
+- `25to1/scripts/augment_stage1_features_with_ndvi.py` was hardened for Windows/Huawei-drive behavior
+- it now uses atomic replacement with retry and resume support via `--start-day`
+
+## Update 2026-04-02: H1 split-aware pseudo-label and rolling SCM
+
+After extending to H1, we rebuilt the split-aware pseudo-label chain using `Jan-Apr` station collocations as training data and applied it to the whole `Jan-Jun` daily stack.
+
+New pseudo-label artifacts:
+
+- `25to1/data/stage1/models/modis_at_bootstrap_h1_janaprtrain/training_summary.json`
+- `25to1/data/stage1/processed/modis_at_bootstrap_h1_janaprtrain/manifest.json`
+
+New rolling SCM artifacts:
+
+- `25to1/data/stage1/processed/scm_bootstrap_h1_janaprtrain_rolling15/manifest.json`
+
+Updated patch-index artifact:
+
+- `25to1/data/stage1/processed/stage1_patch_index_h1_janaprtrain_ps64_s64_v50/stage1_patch_index.csv`
+- `25to1/data/stage1/processed/stage1_patch_index_h1_janaprtrain_ps64_s64_v50/stage1_patch_index_summary.json`
+
+Key summary:
+
+- pseudo-labels now cover `181` days
+- the H1 patch index contains `4097` valid patches
+- split breakdown is `2881` train patches and `1216` test patches using split date `2018-05-01`
+
+Current interpretation:
+
+- the SCM prior is now based on a substantially longer seasonal window than the earlier `Q1` and `Jan-Apr` versions
+- that makes H1 the current best bootstrap testbed for checking whether the paper-style architecture can start benefiting from SCM

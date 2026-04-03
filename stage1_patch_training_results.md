@@ -477,3 +477,85 @@ So the next best move is no longer another quick bootstrap formula tweak. It is:
 1. continue extending the time span beyond `Jan-Apr`
 2. keep the split-aware pseudo-label generation strict
 3. rerun the same `srcnn_like vs sr_weather_like` comparison as the SCM prior becomes more climatological and less short-window-smoothed
+
+## 16. Update: H1 extension with Jan-Apr train / May-Jun test
+
+We then extended the same split-aware pseudo-label and rolling-SCM pipeline into full `H1`.
+
+New artifacts:
+
+- H1 split-aware pseudo-label model:
+  - `25to1/data/stage1/models/modis_at_bootstrap_h1_janaprtrain/training_summary.json`
+- H1 pseudo-label rasters:
+  - `25to1/data/stage1/processed/modis_at_bootstrap_h1_janaprtrain/manifest.json`
+- H1 rolling SCM:
+  - `25to1/data/stage1/processed/scm_bootstrap_h1_janaprtrain_rolling15/manifest.json`
+- H1 patch index:
+  - `25to1/data/stage1/processed/stage1_patch_index_h1_janaprtrain_ps64_s64_v50/stage1_patch_index.csv`
+  - `25to1/data/stage1/processed/stage1_patch_index_h1_janaprtrain_ps64_s64_v50/stage1_patch_index_summary.json`
+
+Patch-index summary:
+
+- date range: `2018-01-01` to `2018-06-30`
+- split date: `2018-05-01`
+- train period: `Jan-Apr`
+- test period: `May-Jun`
+- total patches: `4097`
+- train patches: `2881`
+- test patches: `1216`
+
+### 16.1 Quick patch runs with H1 rolling SCM
+
+We reran the same two-model comparison:
+
+- `srcnn_like`
+- `sr_weather_like`
+
+Outputs:
+
+- `25to1/data/stage1/models/stage1_patch_cnn_scmroll15_h1_janaprtrain_ps64_s64_v50/training_summary.json`
+- `25to1/data/stage1/models/stage1_patch_sr_weather_like_scmroll15_h1_janaprtrain_ps64_s64_v50/training_summary.json`
+
+Best H1 test RMSE:
+
+- `srcnn_like`: `0.208`
+- `sr_weather_like`: `0.217`
+
+Important note:
+
+- for `sr_weather_like`, the best test score occurred at epoch `1`
+- epoch `2` drifted slightly worse, so the current comparison should use the summary's `best_test_rmse`, not just the final epoch line
+
+### 16.2 Comparison with the earlier Jan-Apr split
+
+Earlier Jan-Apr setup with Apr holdout:
+
+- `srcnn_like`: `RMSE 0.190`
+- `sr_weather_like`: `RMSE 0.203`
+
+Now, with the harder H1 setup and May-Jun holdout:
+
+- `srcnn_like`: `RMSE 0.208`
+- `sr_weather_like`: `RMSE 0.217`
+
+### 16.3 Interpretation
+
+- The H1 holdout is harder than the earlier single-month April holdout, so some degradation is expected.
+- Even on this harder setup, the rolling-SCM patch pipeline remains much stronger than the old Q1-era SCM experiments.
+- `srcnn_like` still performs best, but `sr_weather_like` is now very close in best-RMSE terms.
+- That is a healthier signal than we had earlier: the paper-inspired gating structure is no longer clearly off the pace once the SCM prior has a longer temporal basis.
+
+## 17. Current practical conclusion
+
+The current Stage-1 picture is now much clearer:
+
+- longer temporal coverage really does matter for SCM usefulness
+- the H1 pipeline is substantially more informative than the earlier Q1 bootstrap
+- the best simple image model is still `srcnn_like`
+- but the gap to `sr_weather_like` is now small enough that further time extension may plausibly flip the ranking later
+
+So the next high-value move is:
+
+1. extend the same strict split-aware pipeline beyond `H1`
+2. keep evaluating `srcnn_like` and `sr_weather_like` side by side
+3. watch whether the SCM-enabled architecture overtakes the simpler baseline once the temporal basis becomes even more climatological

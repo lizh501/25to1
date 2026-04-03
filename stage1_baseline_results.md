@@ -459,3 +459,72 @@ Interpretation:
 - Spatial holdout remains very strong after extending to four months.
 - The linear baseline is still the cleanest simple model in this bootstrap setting.
 - The main remaining uncertainty is no longer whether the feature stack is useful, but how much of that signal can transfer into the Stage-1 image-to-image training setup.
+
+## Update 2026-04-02: H1 full-65 extension
+
+We then extended the same full-65 station bootstrap into full `2018 H1`.
+
+Extended artifacts:
+
+- `25to1/data/stage1/processed/station_collocations_full65_h1/stage1_station_collocations_2018_01.csv`
+- `25to1/data/stage1/processed/station_collocations_full65_h1/stage1_station_collocations_2018_01_summary.json`
+- `25to1/data/stage1/models/station_baseline_full65_h1/time_split_janapr_train_mayjun_test/metrics_summary.json`
+- `25to1/data/stage1/models/station_baseline_full65_h1/holdout_station_108/metrics_summary.json`
+
+Important note:
+
+- the collocation file name still keeps the legacy `2018_01` suffix
+- the actual content now spans `2018-01-01` to `2018-06-30`
+
+Expanded collocation summary:
+
+- rows: `11765`
+- date range: `2018-01-01` to `2018-06-30`
+- station count: `65`
+
+### Jan-Apr-train / May-Jun-test time split
+
+Experiment:
+
+- train dates: `2018-01-01` to `2018-04-30`
+- test dates: `2018-05-01` to `2018-06-30`
+- train rows: `7793`
+- test rows: `3960`
+- output dir: `25to1/data/stage1/models/station_baseline_full65_h1/time_split_janapr_train_mayjun_test`
+
+Metrics:
+
+- `era5_only`: `MAE 1.055`, `RMSE 1.399`, `R2 0.854`
+- `linear_regression`: `MAE 0.970`, `RMSE 1.271`, `R2 0.880`
+- `random_forest`: `MAE 1.909`, `RMSE 2.480`, `R2 0.542`
+- `linear_regression_grid_only`: `MAE 0.994`, `RMSE 1.310`, `R2 0.872`
+- `random_forest_grid_only`: `MAE 1.912`, `RMSE 2.482`, `R2 0.541`
+
+Interpretation:
+
+- This is the strongest temporal-generalization result so far in the bootstrap line.
+- The linear baseline now clearly beats raw `ERA5` on an unseen two-month holdout.
+- The random-forest baselines degrade badly on this longer holdout, which makes the linear model the more trustworthy simple reference.
+
+### H1 holdout check for station 108
+
+Experiment:
+
+- holdout station: `108`
+- train rows: `11572`
+- test rows: `181`
+- output dir: `25to1/data/stage1/models/station_baseline_full65_h1/holdout_station_108`
+
+Metrics:
+
+- `era5_only`: `MAE 0.995`, `RMSE 1.228`, `R2 0.987`
+- `linear_regression`: `MAE 0.754`, `RMSE 0.982`, `R2 0.991`
+- `random_forest`: `MAE 0.843`, `RMSE 1.074`, `R2 0.990`
+- `linear_regression_grid_only`: `MAE 0.787`, `RMSE 1.012`, `R2 0.991`
+- `random_forest_grid_only`: `MAE 0.842`, `RMSE 1.073`, `R2 0.990`
+
+Interpretation:
+
+- Spatial holdout remains excellent on the full H1 set.
+- The linear baseline is still the cleanest overall simple model.
+- Taken together with the stronger time split, the H1 feature stack now looks much more mature than the earlier Q1 bootstrap.
