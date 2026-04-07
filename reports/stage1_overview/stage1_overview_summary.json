@@ -1,0 +1,169 @@
+{
+  "collocation_csv": "E:\\18664-C5F119\\华为家庭存储\\CUBD\\Research\\HXGG2025-6-2\\hxgg2025-6-2\\25to1\\data\\stage1\\processed\\station_collocations_full65_jansep\\stage1_station_collocations_2018_01.csv",
+  "row_count": 17680,
+  "station_count": 65,
+  "date_min": "2018-01-01",
+  "date_max": "2018-09-30",
+  "feature_stats": {
+    "station_avg_temp_c": {
+      "count": 17662,
+      "mean": 14.594004076548522,
+      "std": 10.96626773730585,
+      "min": -19.9,
+      "p25": 5.7,
+      "p50": 17.2,
+      "p75": 23.0,
+      "max": 34.1
+    },
+    "era5_t2m_c": {
+      "count": 17680,
+      "mean": 14.619735510541535,
+      "std": 10.72563125946252,
+      "min": -18.15595245361328,
+      "p25": 5.758183121681213,
+      "p50": 17.109280586242676,
+      "p75": 22.93370962142944,
+      "max": 33.09236145019531
+    },
+    "lst_mean_c": {
+      "count": 9785,
+      "mean": 15.707627594976566,
+      "std": 12.106365179649861,
+      "min": -19.88999938964844,
+      "p25": 6.240005493164063,
+      "p50": 17.399993896484375,
+      "p75": 25.470001220703125,
+      "max": 44.07000732421875
+    },
+    "ndvi": {
+      "count": 17680,
+      "mean": 0.41282787337031096,
+      "std": 0.179454172458124,
+      "min": -0.1164999976754188,
+      "p25": 0.2653000056743622,
+      "p50": 0.3849000036716461,
+      "p75": 0.555899977684021,
+      "max": 0.8784000277519226
+    },
+    "solar_incoming_w_m2": {
+      "count": 17680,
+      "mean": 194.51235182242155,
+      "std": 77.8986040576166,
+      "min": 14.363518714904783,
+      "p25": 134.30621719360352,
+      "p50": 202.1500701904297,
+      "p75": 258.70642089843744,
+      "max": 337.4400939941406
+    },
+    "dem_m": {
+      "count": 17680,
+      "mean": 113.75984543653635,
+      "std": 152.37032174415097,
+      "min": 3.8943703174591056,
+      "p25": 28.308372497558597,
+      "p50": 47.4423828125,
+      "p75": 149.5955352783203,
+      "max": 772.7655639648438
+    },
+    "imp_proxy": {
+      "count": 17680,
+      "mean": 0.44807692307693314,
+      "std": 0.39278986034834046,
+      "min": 0.0,
+      "p25": 1.4210854715202006e-13,
+      "p50": 0.375,
+      "p75": 0.875,
+      "max": 1.0
+    }
+  },
+  "monthly_coverage": {
+    "path": "E:\\18664-C5F119\\华为家庭存储\\CUBD\\Research\\HXGG2025-6-2\\hxgg2025-6-2\\25to1\\reports\\stage1_overview\\figures\\stage1_monthly_coverage.png",
+    "month_counts": {
+      "2018-01": 2015,
+      "2018-02": 1820,
+      "2018-03": 2015,
+      "2018-04": 1950,
+      "2018-05": 2015,
+      "2018-06": 1950,
+      "2018-07": 2015,
+      "2018-08": 2015,
+      "2018-09": 1885
+    }
+  },
+  "feature_relationships": {
+    "path": "E:\\18664-C5F119\\华为家庭存储\\CUBD\\Research\\HXGG2025-6-2\\hxgg2025-6-2\\25to1\\reports\\stage1_overview\\figures\\stage1_feature_relationships.png",
+    "corr_station_era5": 0.9902627676940996,
+    "corr_station_lst_mean": 0.9127535067276311
+  },
+  "model_progress": {
+    "path": "E:\\18664-C5F119\\华为家庭存储\\CUBD\\Research\\HXGG2025-6-2\\hxgg2025-6-2\\25to1\\reports\\stage1_overview\\figures\\stage1_model_progress.png",
+    "baseline_points": [
+      {
+        "label": "Jan",
+        "era5_rmse": 2.049864593924266,
+        "linear_rmse": 1.8970123299656187,
+        "test_rows": 715
+      },
+      {
+        "label": "Jan-Feb",
+        "era5_rmse": 1.6859894513581843,
+        "linear_rmse": 1.4346729335076205,
+        "test_rows": 1820
+      },
+      {
+        "label": "Q1",
+        "era5_rmse": 1.8160540143912014,
+        "linear_rmse": 1.9133155966759585,
+        "test_rows": 2015
+      },
+      {
+        "label": "Jan-Apr",
+        "era5_rmse": 1.6966675347991165,
+        "linear_rmse": 1.6627320306043598,
+        "test_rows": 1948
+      },
+      {
+        "label": "H1",
+        "era5_rmse": 1.3991142100527314,
+        "linear_rmse": 1.2709265546257378,
+        "test_rows": 3960
+      },
+      {
+        "label": "Jan-Sep",
+        "era5_rmse": 1.248514355184052,
+        "linear_rmse": 1.0597051983975596,
+        "test_rows": 5909
+      }
+    ],
+    "patch_points": [
+      {
+        "label": "Q1 srcnn",
+        "best_test_rmse": 0.2941703498363495
+      },
+      {
+        "label": "Q1 se-srcnn",
+        "best_test_rmse": 0.33866721391677856
+      },
+      {
+        "label": "Q1 sr-weather",
+        "best_test_rmse": 0.31695079803466797
+      },
+      {
+        "label": "Jan-Apr srcnn+SCM",
+        "best_test_rmse": 0.18989716470241547
+      },
+      {
+        "label": "Jan-Apr sr-weather+SCM",
+        "best_test_rmse": 0.20320673286914825
+      },
+      {
+        "label": "H1 srcnn+SCM",
+        "best_test_rmse": 0.20813024044036865
+      },
+      {
+        "label": "H1 sr-weather+SCM",
+        "best_test_rmse": 0.21662567555904388
+      }
+    ]
+  }
+}

@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 import re
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -54,8 +55,21 @@ def target_grid_from_lst(day_path: Path):
 
 def save_npz_atomic(path: Path, **payload) -> None:
     tmp_path = path.with_name(path.name + ".tmp.npz")
-    np.savez_compressed(tmp_path, **payload)
-    os.replace(tmp_path, path)
+    last_error = None
+    for attempt in range(1, 11):
+        try:
+            np.savez_compressed(tmp_path, **payload)
+            os.replace(tmp_path, path)
+            return
+        except PermissionError as exc:
+            last_error = exc
+            if tmp_path.exists():
+                try:
+                    tmp_path.unlink()
+                except PermissionError:
+                    pass
+            time.sleep(0.5 * attempt)
+    raise PermissionError(f"Failed to replace {path} after retries: {last_error}")
 
 
 def main() -> None:
@@ -63,6 +77,7 @@ def main() -> None:
     parser.add_argument("--features-dir", default="25to1/data/stage1/processed/stage1_simplified_features")
     parser.add_argument("--daily-dir", default="25to1/data/stage1/interim/mod11a1_daily")
     parser.add_argument("--scm-manifest", default="25to1/data/stage1/processed/scm_bootstrap_q1_janfebtrain/manifest.json")
+    parser.add_argument("--start-day", default="", help="Optional resume day like A2018182.")
     parser.add_argument("--skip-existing", action="store_true")
     args = parser.parse_args()
 
@@ -74,12 +89,16 @@ def main() -> None:
     day_map = {entry["day"]: entry for entry in entries if "day" in entry}
 
     updated = 0
+    failed = 0
     for npz_path in sorted(features_dir.glob("A*.npz")):
         if not DAY_NPZ_RE.match(npz_path.name):
             print(f"SKIP {npz_path.name}: non-standard filename")
             continue
 
         day = npz_path.stem
+        if args.start_day and day < args.start_day:
+            continue
+
         if day in day_map:
             entry = day_map[day]
         else:
@@ -114,11 +133,17 @@ def main() -> None:
             )
 
         payload["scm_bootstrap_c"] = scm_resampled.astype(np.float32)
-        save_npz_atomic(npz_path, **payload)
+        try:
+            save_npz_atomic(npz_path, **payload)
+        except PermissionError as exc:
+            failed += 1
+            print(f"FAIL {day}: {exc}")
+            continue
+
         updated += 1
         print(f"UPDATED {day}: scm_mean={float(np.nanmean(scm_resampled)):.2f}C")
 
-    print(f"Done. updated={updated}")
+    print(f"Done. updated={updated} failed={failed}")
 
 
 if __name__ == "__main__":

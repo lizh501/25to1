@@ -1,6 +1,7 @@
 import argparse
 import os
 import re
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -103,7 +104,15 @@ def target_grid_from_lst(day_path: Path):
 def save_npz_atomic(path: Path, **payload) -> None:
     tmp_path = path.with_name(path.name + ".tmp.npz")
     np.savez_compressed(tmp_path, **payload)
-    os.replace(tmp_path, path)
+    last_error = None
+    for _ in range(10):
+        try:
+            os.replace(tmp_path, path)
+            return
+        except PermissionError as exc:
+            last_error = exc
+            time.sleep(0.5)
+    raise last_error
 
 
 def main() -> None:
@@ -115,6 +124,7 @@ def main() -> None:
     parser.add_argument("--solar-glob", default="era5_daily_ssrd_*.nc", help="Glob used with --solar-dir.")
     parser.add_argument("--variable", default="ssrd", help="NetCDF variable name, default: ssrd")
     parser.add_argument("--skip-existing", action="store_true", help="Skip npz files that already contain solar fields.")
+    parser.add_argument("--start-day", default="", help="Optional start day like A2018201 for resume runs.")
     args = parser.parse_args()
 
     features_dir = Path(args.features_dir).resolve()
@@ -126,12 +136,15 @@ def main() -> None:
     solar_items, solar_date_index = load_era5_collection(solar_paths, args.variable)
 
     updated = 0
+    failed = 0
     for npz_path in sorted(features_dir.glob("A*.npz")):
         if not DAY_NPZ_RE.match(npz_path.name):
             print(f"SKIP {npz_path.name}: non-standard filename")
             continue
 
         day = npz_path.stem
+        if args.start_day and day < args.start_day:
+            continue
         day_date = modis_day_to_date(day)
         if day_date not in solar_date_index:
             print(f"SKIP {day}: no solar match in provided files")
@@ -163,7 +176,12 @@ def main() -> None:
             payload = {key: old[key].copy() for key in old.files}
         payload["solar_incoming_j_m2_day"] = solar_j_m2_day.astype(np.float32)
         payload["solar_incoming_w_m2"] = solar_w_m2_mean.astype(np.float32)
-        save_npz_atomic(npz_path, **payload)
+        try:
+            save_npz_atomic(npz_path, **payload)
+        except PermissionError as exc:
+            failed += 1
+            print(f"FAIL {day}: {exc}")
+            continue
         updated += 1
         print(
             f"UPDATED {day}: "
@@ -173,7 +191,7 @@ def main() -> None:
 
     for item in solar_items:
         item["ds"].close()
-    print(f"Done. updated={updated}")
+    print(f"Done. updated={updated} failed={failed}")
 
 
 if __name__ == "__main__":
