@@ -42,6 +42,20 @@ def target_rowcol(lst_day_path: Path, lon: float, lat: float) -> tuple[int, int]
         return int(row), int(col)
 
 
+def build_pixel_lookup(lst_day_path: Path, metadata_rows: list[dict]) -> dict[tuple[str, str], tuple[int, int]]:
+    lons = [float(meta["longitude"]) for meta in metadata_rows]
+    lats = [float(meta["latitude"]) for meta in metadata_rows]
+    with rasterio.open(lst_day_path) as ds:
+        xs, ys = transform("EPSG:4326", ds.crs, lons, lats)
+        pairs = [ds.index(x, y) for x, y in zip(xs, ys)]
+
+    pixel_lookup: dict[tuple[str, str], tuple[int, int]] = {}
+    for meta, (row, col) in zip(metadata_rows, pairs):
+        key = (meta["source"], meta["station_id"])
+        pixel_lookup[key] = (int(row), int(col))
+    return pixel_lookup
+
+
 def sample_npz_loaded(data, row: int, col: int) -> dict:
     out = {}
     for key in data.files:
@@ -57,6 +71,30 @@ def sample_npz_loaded(data, row: int, col: int) -> dict:
 def sample_npz(npz_path: Path, row: int, col: int) -> dict:
     data = np.load(npz_path)
     return sample_npz_loaded(data, row, col)
+
+
+def sample_npz_batch_loaded(data, rowcols: list[tuple[int, int]]) -> list[dict]:
+    if not rowcols:
+        return []
+
+    rows = np.asarray([item[0] for item in rowcols], dtype=int)
+    cols = np.asarray([item[1] for item in rowcols], dtype=int)
+    sampled: dict[str, list] = {}
+
+    for key in data.files:
+        values = data[key][rows, cols]
+        if np.issubdtype(values.dtype, np.integer):
+            sampled[key] = [int(item) for item in values.tolist()]
+        else:
+            out = []
+            for item in values.tolist():
+                out.append(None if not np.isfinite(item) else float(item))
+            sampled[key] = out
+
+    records = []
+    for idx in range(len(rowcols)):
+        records.append({key: sampled[key][idx] for key in sampled})
+    return records
 
 
 def coerce_float(text: str) -> float | None:
@@ -82,7 +120,7 @@ def build_records(
         raise RuntimeError(f"No daily directories found in {daily_dir}")
     reference_lst_day_path = next(day_dirs[0].glob("*_lst_day_c.tif"))
 
-    pixel_lookup: dict[tuple[str, str], tuple[int, int]] = {}
+    pixel_lookup = build_pixel_lookup(reference_lst_day_path, metadata_rows)
     meta_lookup: dict[tuple[str, str], dict] = {}
     rows_by_source_station: dict[tuple[str, str], list[dict]] = {}
     rows_by_day: dict[str, list[tuple[dict, dict]]] = {}
@@ -90,7 +128,6 @@ def build_records(
     for meta in metadata_rows:
         key = (meta["source"], meta["station_id"])
         meta_lookup[key] = meta
-        pixel_lookup[key] = target_rowcol(reference_lst_day_path, float(meta["longitude"]), float(meta["latitude"]))
 
     for rows in station_tables.values():
         for row in rows:
@@ -113,12 +150,14 @@ def build_records(
         if not npz_path.exists() or not day_dir.exists():
             continue
         data = np.load(npz_path)
+        day_items = rows_by_day[modis_day]
+        rowcols = [pixel_lookup[(meta["source"], meta["station_id"])] for meta, _ in day_items]
+        feature_rows = sample_npz_batch_loaded(data, rowcols)
 
-        for meta, row in rows_by_day[modis_day]:
+        for (meta, row), features in zip(day_items, feature_rows):
             source = meta["source"]
             station_id = meta["station_id"]
             px_row, px_col = pixel_lookup[(source, station_id)]
-            features = sample_npz_loaded(data, px_row, px_col)
             record = {
                 "source": source,
                 "station_id": station_id,
@@ -163,6 +202,11 @@ def main() -> None:
     parser.add_argument("--features-dir", default="25to1/data/stage1/processed/stage1_simplified_features")
     parser.add_argument("--daily-dir", default="25to1/data/stage1/interim/mod11a1_daily")
     parser.add_argument("--output-dir", default="25to1/data/stage1/processed/station_collocations")
+    parser.add_argument(
+        "--merge-existing-csv",
+        default=None,
+        help="Optional existing collocation CSV to merge with new records and de-duplicate by source/station/date.",
+    )
     args = parser.parse_args()
 
     metadata_rows = load_station_metadata(Path(args.station_meta).resolve())
@@ -183,9 +227,21 @@ def main() -> None:
 
     output_dir = Path(args.output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
-    csv_path = output_dir / "stage1_station_collocations_2018_01.csv"
     if not records:
         raise RuntimeError("No collocation records were built.")
+
+    if args.merge_existing_csv:
+        existing_path = Path(args.merge_existing_csv).resolve()
+        with existing_path.open("r", encoding="utf-8", newline="") as f:
+            existing_records = list(csv.DictReader(f))
+        deduped = {}
+        for record in existing_records + records:
+            key = (record["source"], str(record["station_id"]), record["date"])
+            deduped[key] = record
+        records = list(deduped.values())
+
+    records.sort(key=lambda row: (row["source"], str(row["station_id"]), row["date"]))
+    csv_path = output_dir / "stage1_station_collocations_2018_01.csv"
 
     fieldnames = []
     for record in records:

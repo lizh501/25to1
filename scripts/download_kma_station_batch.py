@@ -1,5 +1,6 @@
 import argparse
 import csv
+import json
 import os
 from pathlib import Path
 
@@ -43,7 +44,9 @@ def main() -> None:
     parser.add_argument("--output-dir", default="25to1/data/stage1/raw/stations")
     parser.add_argument("--extract", action="store_true")
     parser.add_argument("--limit", type=int, default=0)
+    parser.add_argument("--offset", type=int, default=0)
     parser.add_argument("--skip-existing", action="store_true")
+    parser.add_argument("--result-json", default=None, help="Optional JSON path for succeeded/skipped/failed station IDs.")
     args = parser.parse_args()
 
     env_path = resolve_input_path(args.env_file)
@@ -58,6 +61,8 @@ def main() -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     station_ids = load_station_ids(Path(args.stations_csv).resolve(), args.source)
+    if args.offset > 0:
+        station_ids = station_ids[args.offset :]
     if args.limit > 0:
         station_ids = station_ids[: args.limit]
 
@@ -120,6 +125,22 @@ def main() -> None:
     if failed:
         for station_id, error in failed[:20]:
             print(f"FAILED_STATION {station_id} {error}")
+
+    if args.result_json:
+        result_path = Path(args.result_json).resolve()
+        result_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "source": args.source,
+            "year": args.year,
+            "frequency": args.frequency,
+            "offset": args.offset,
+            "limit": args.limit,
+            "succeeded": succeeded,
+            "skipped": skipped,
+            "failed": [{"station_id": station_id, "error": error} for station_id, error in failed],
+        }
+        result_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+        print(f"RESULT_JSON {result_path}")
 
 
 if __name__ == "__main__":
