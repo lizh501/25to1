@@ -63,6 +63,11 @@ def main() -> None:
     parser.add_argument("--detail-dir", default="25to1/data/stage1/interim/kma_station_details")
     parser.add_argument("--output-csv", default="25to1/data/stage1/processed/stations/station_metadata_batch.csv")
     parser.add_argument("--output-json", default="25to1/data/stage1/processed/stations/station_metadata_batch.json")
+    parser.add_argument(
+        "--invalid-log",
+        default="",
+        help="Optional path to write skipped HTML files and parse errors.",
+    )
     args = parser.parse_args()
 
     detail_dir = Path(args.detail_dir)
@@ -70,7 +75,18 @@ def main() -> None:
     if not html_paths:
         raise RuntimeError(f"No HTML files found in {detail_dir.resolve()}")
 
-    rows = [parse_detail_html(path) for path in html_paths]
+    rows = []
+    invalid_rows = []
+    for path in html_paths:
+        try:
+            rows.append(parse_detail_html(path))
+        except Exception as exc:
+            invalid_rows.append(
+                {
+                    "detail_html": str(path),
+                    "error": str(exc),
+                }
+            )
 
     output_csv = Path(args.output_csv)
     output_csv.parent.mkdir(parents=True, exist_ok=True)
@@ -95,9 +111,15 @@ def main() -> None:
     output_json = Path(args.output_json)
     output_json.write_text(json.dumps(rows, indent=2, ensure_ascii=False), encoding="utf-8")
 
+    if args.invalid_log:
+        invalid_log = Path(args.invalid_log)
+        invalid_log.parent.mkdir(parents=True, exist_ok=True)
+        invalid_log.write_text(json.dumps(invalid_rows, indent=2, ensure_ascii=False), encoding="utf-8")
+
     print(f"WROTE {output_csv.resolve()}")
     print(f"WROTE {output_json.resolve()}")
     print(f"ROWS {len(rows)}")
+    print(f"SKIPPED {len(invalid_rows)}")
 
 
 if __name__ == "__main__":
