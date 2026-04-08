@@ -27,7 +27,7 @@ def is_leap_year(year: int) -> bool:
     return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
 
 
-def collect_daily_items(labels_dir: Path, features_dir: Path | None) -> list[dict]:
+def collect_daily_items(labels_dir: Path, features_dir: Path | None, label_stem: str) -> list[dict]:
     items = []
     for day_dir in sorted(path for path in labels_dir.iterdir() if path.is_dir() and path.name.startswith("A")):
         day = day_dir.name
@@ -36,8 +36,8 @@ def collect_daily_items(labels_dir: Path, features_dir: Path | None) -> list[dic
         if doy is None:
             continue
 
-        pred_path = day_dir / f"{day}_modis_at_bootstrap_c.tif"
-        valid_path = day_dir / f"{day}_modis_at_bootstrap_valid.tif"
+        pred_path = day_dir / f"{day}_{label_stem}_c.tif"
+        valid_path = day_dir / f"{day}_{label_stem}_valid.tif"
         if not pred_path.exists() or not valid_path.exists():
             continue
 
@@ -230,6 +230,11 @@ def main() -> None:
     parser.add_argument("--labels-dir", required=True, help="Daily MODIS-AT label directory with AYYYYDDD subfolders.")
     parser.add_argument("--features-dir", default="", help="Optional simplified-feature directory for ERA5 calendar-day standardization.")
     parser.add_argument("--output-dir", required=True)
+    parser.add_argument(
+        "--label-stem",
+        default="modis_at_paperlike",
+        help="Filename stem after the day prefix, for example modis_at_paperlike or modis_at_bootstrap.",
+    )
     parser.add_argument("--smooth-window", type=int, default=11)
     parser.add_argument("--fill-iterations", type=int, default=10)
     parser.add_argument(
@@ -245,7 +250,7 @@ def main() -> None:
     output_dir = Path(args.output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    items = collect_daily_items(labels_dir, features_dir)
+    items = collect_daily_items(labels_dir, features_dir, args.label_stem)
     if not items:
         raise RuntimeError(f"No daily label items found in {labels_dir}")
 
@@ -257,6 +262,13 @@ def main() -> None:
     )
     era5_mean, era5_std = build_era5_calendar_stats(loaded_items)
     anomaly_maps = standardize_with_era5(climatology_maps, era5_mean, era5_std)
+    era5_summary = None
+    if era5_mean is not None and era5_std is not None:
+        era5_summary = {
+            "mean_valid_doy": int(np.sum(np.any(np.isfinite(era5_mean), axis=(1, 2)))),
+            "std_valid_doy": int(np.sum(np.any(np.isfinite(era5_std), axis=(1, 2)))),
+        }
+    anomaly_has_valid = bool(np.any(np.isfinite(anomaly_maps)))
 
     profile = loaded_items[0]["profile"]
     manifest = {
@@ -266,6 +278,7 @@ def main() -> None:
         "date_min": loaded_items[0]["date"].strftime("%Y-%m-%d"),
         "date_max": loaded_items[-1]["date"].strftime("%Y-%m-%d"),
         "climatology_summary": climatology_summary,
+        "era5_calendar_stats_summary": era5_summary,
         "outputs": {},
     }
 
@@ -273,13 +286,20 @@ def main() -> None:
         climatology_dir = output_dir / "climatology_365"
         manifest["outputs"]["climatology_365"] = write_doy_rasters(climatology_dir, climatology_maps, profile, "scm_climatology")
     if args.output_mode in {"anomaly_standardized", "both"}:
-        anomaly_dir = output_dir / "anomaly_standardized_365"
-        manifest["outputs"]["anomaly_standardized_365"] = write_doy_rasters(
-            anomaly_dir,
-            anomaly_maps,
-            profile,
-            "scm_anomaly_standardized",
-        )
+        if anomaly_has_valid:
+            anomaly_dir = output_dir / "anomaly_standardized_365"
+            manifest["outputs"]["anomaly_standardized_365"] = write_doy_rasters(
+                anomaly_dir,
+                anomaly_maps,
+                profile,
+                "scm_anomaly_standardized",
+            )
+        else:
+            manifest["outputs"]["anomaly_standardized_365"] = []
+            manifest["anomaly_standardized_skipped_reason"] = (
+                "No finite ERA5-standardized anomaly values were available. "
+                "With only one year per day-of-year, calendar-day ERA5 std is undefined; multi-year coverage is needed."
+            )
 
     manifest_path = output_dir / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
