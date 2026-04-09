@@ -37,13 +37,14 @@ def build_records_for_day(
     day: str,
     features_dir: Path,
     labels_dir: Path,
+    label_stem: str,
     patch_size: int,
     stride: int,
     min_valid_frac: float,
     split_date: str,
 ) -> tuple[list[dict], dict]:
-    valid_path = labels_dir / day / f"{day}_modis_at_bootstrap_valid.tif"
-    label_path = labels_dir / day / f"{day}_modis_at_bootstrap_c.tif"
+    valid_path = labels_dir / day / f"{day}_{label_stem}_valid.tif"
+    label_path = labels_dir / day / f"{day}_{label_stem}_c.tif"
     npz_path = features_dir / f"{day}.npz"
     if not valid_path.exists() or not label_path.exists() or not npz_path.exists():
         return [], {"day": day, "patches": 0, "skipped": True}
@@ -102,6 +103,7 @@ def main() -> None:
     parser.add_argument("--features-dir", default="25to1/data/stage1/processed/stage1_simplified_features")
     parser.add_argument("--labels-dir", default="25to1/data/stage1/processed/modis_at_bootstrap_q1")
     parser.add_argument("--output-dir", default="25to1/data/stage1/processed/stage1_patch_index_q1")
+    parser.add_argument("--label-stem", default="modis_at_bootstrap")
     parser.add_argument("--patch-size", type=int, default=64)
     parser.add_argument("--stride", type=int, default=64)
     parser.add_argument("--min-valid-frac", type=float, default=0.5)
@@ -122,6 +124,7 @@ def main() -> None:
             day=day,
             features_dir=features_dir,
             labels_dir=labels_dir,
+            label_stem=args.label_stem,
             patch_size=args.patch_size,
             stride=args.stride,
             min_valid_frac=args.min_valid_frac,

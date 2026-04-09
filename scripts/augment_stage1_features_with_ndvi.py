@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 import re
+import tempfile
 import time
 from datetime import datetime, date
 from pathlib import Path
@@ -68,17 +69,24 @@ def target_grid_from_lst(day_path: Path):
 
 
 def save_npz_atomic(path: Path, **payload) -> None:
-    tmp_path = path.with_name(path.name + ".tmp.npz")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(prefix=path.stem + "_", suffix=".npz", dir=path.parent)
+    os.close(fd)
+    tmp_path = Path(tmp_name)
     np.savez_compressed(tmp_path, **payload)
+    actual_tmp_path = tmp_path if tmp_path.exists() else tmp_path.with_suffix(tmp_path.suffix + ".npz")
     last_error = None
     for _ in range(10):
         try:
-            os.replace(tmp_path, path)
+            os.replace(actual_tmp_path, path)
             return
-        except PermissionError as exc:
+        except (PermissionError, FileNotFoundError) as exc:
             last_error = exc
             time.sleep(0.5)
-    raise last_error
+    # Fallback for Windows/network-storage races where atomic replace keeps failing.
+    np.savez_compressed(path, **payload)
+    if actual_tmp_path.exists():
+        actual_tmp_path.unlink(missing_ok=True)
 
 
 def main() -> None:
@@ -87,6 +95,7 @@ def main() -> None:
     parser.add_argument("--daily-dir", default="25to1/data/stage1/interim/mod11a1_daily")
     parser.add_argument("--ndvi-manifest", default="25to1/data/stage1/processed/ndvi_composites/manifest.json")
     parser.add_argument("--start-day", default="", help="Optional start day like A2018146 for resume runs.")
+    parser.add_argument("--skip-existing", action="store_true", help="Skip npz files that already contain an ndvi field.")
     args = parser.parse_args()
 
     features_dir = Path(args.features_dir).resolve()
@@ -131,6 +140,9 @@ def main() -> None:
             )
 
         with np.load(npz_path) as old:
+            if args.skip_existing and "ndvi" in old.files:
+                print(f"SKIP {day}: existing ndvi field")
+                continue
             # Copy arrays into memory before overwriting the same npz on Windows.
             payload = {key: old[key].copy() for key in old.files}
         payload["ndvi"] = ndvi_resampled.astype(np.float32)

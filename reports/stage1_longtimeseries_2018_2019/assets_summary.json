@@ -1,0 +1,35 @@
+{
+  "report_dir": "E:\\18664-C5F119\\华为家庭存储\\CUBD\\Research\\HXGG2025-6-2\\hxgg2025-6-2\\25to1\\reports\\stage1_longtimeseries_2018_2019",
+  "figures": {
+    "scm_cycle": "E:\\18664-C5F119\\华为家庭存储\\CUBD\\Research\\HXGG2025-6-2\\hxgg2025-6-2\\25to1\\reports\\stage1_longtimeseries_2018_2019\\figures\\scm_climatology_cycle_2018_2019.png",
+    "station_model_compare": "E:\\18664-C5F119\\华为家庭存储\\CUBD\\Research\\HXGG2025-6-2\\hxgg2025-6-2\\25to1\\reports\\stage1_longtimeseries_2018_2019\\figures\\station_model_compare_2018_2019.png",
+    "patch_model_compare": "E:\\18664-C5F119\\华为家庭存储\\CUBD\\Research\\HXGG2025-6-2\\hxgg2025-6-2\\25to1\\reports\\stage1_longtimeseries_2018_2019\\figures\\patch_model_compare_2018_2019.png"
+  },
+  "scm_stats": {
+    "climatology_mean_min": 1.806946873664856,
+    "climatology_mean_max": 13.341585159301758,
+    "anomaly_extreme_day_count": 286,
+    "anomaly_extreme_days_head": [
+      1,
+      2,
+      3,
+      5,
+      6,
+      7,
+      9,
+      13,
+      14,
+      15,
+      18,
+      19,
+      20,
+      21,
+      22,
+      30,
+      31,
+      32,
+      38,
+      39
+    ]
+  }
+}

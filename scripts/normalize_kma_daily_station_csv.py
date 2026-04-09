@@ -34,6 +34,11 @@ AWS_FIELD_MAP = {
     "최대 순간 풍속 풍향(deg)": "max_instant_wind_dir_deg",
 }
 
+OPTIONAL_SOURCE_FIELDS = {
+    "asos": {"합계 일사(MJ/m2)"},
+    "aws": set(),
+}
+
 
 def detect_source(path: Path) -> str:
     name = path.name.upper()
@@ -47,10 +52,11 @@ def detect_source(path: Path) -> str:
 def normalize_csv(input_path: Path, output_dir: Path) -> dict:
     source = detect_source(input_path)
     field_map = ASOS_FIELD_MAP if source == "asos" else AWS_FIELD_MAP
+    optional_fields = OPTIONAL_SOURCE_FIELDS.get(source, set())
 
     with input_path.open("r", encoding="cp949", newline="") as src:
         reader = csv.DictReader(src)
-        missing = [name for name in field_map if name not in reader.fieldnames]
+        missing = [name for name in field_map if name not in reader.fieldnames and name not in optional_fields]
         if missing:
             raise KeyError(f"Missing expected columns in {input_path.name}: {missing}")
 
@@ -65,7 +71,7 @@ def normalize_csv(input_path: Path, output_dir: Path) -> dict:
             for row in reader:
                 out = {"source": source}
                 for src_name, dst_name in field_map.items():
-                    out[dst_name] = row.get(src_name, "")
+                    out[dst_name] = row.get(src_name, "") if src_name in reader.fieldnames else ""
                 writer.writerow(out)
                 rows += 1
 

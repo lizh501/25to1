@@ -11,7 +11,7 @@ from torch import nn
 from torch.utils.data import DataLoader, Dataset
 
 
-PATCH_FEATURES = [
+BASE_PATCH_FEATURES = [
     "era5_t2m_c",
     "dem_m",
     "slope_deg",
@@ -20,18 +20,19 @@ PATCH_FEATURES = [
     "lst_day_c",
     "lst_night_c",
     "lst_mean_c",
-    "scm_bootstrap_c",
     "ndvi",
     "solar_incoming_w_m2",
     "valid_day",
     "valid_night",
     "valid_mean",
 ]
-INPUT_FEATURES = PATCH_FEATURES + ["aspect_sin", "aspect_cos"]
-STATIC_LIKE_FEATURES = [
-    "dem_m",
-    "scm_bootstrap_c",
-]
+
+
+def build_feature_layout(scm_field: str) -> tuple[list[str], list[str], list[str]]:
+    patch_features = BASE_PATCH_FEATURES[:8] + [scm_field] + BASE_PATCH_FEATURES[8:]
+    input_features = patch_features + ["aspect_sin", "aspect_cos"]
+    static_like_features = ["dem_m", scm_field]
+    return patch_features, input_features, static_like_features
 
 
 def choose_device(device_arg: str) -> str:
@@ -52,7 +53,7 @@ def masked_metrics(pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor)
 
 def normalize_feature(name: str, arr: np.ndarray) -> np.ndarray:
     out = arr.astype(np.float32, copy=True)
-    if name in {"era5_t2m_c", "lst_day_c", "lst_night_c", "lst_mean_c", "scm_bootstrap_c"}:
+    if name in {"era5_t2m_c", "lst_day_c", "lst_night_c", "lst_mean_c", "scm_bootstrap_c", "scm_paperlike_c"}:
         out = np.clip(out, -40.0, 50.0) / 20.0
     elif name == "dem_m":
         out[out <= -10000.0] = np.nan
@@ -73,9 +74,9 @@ def normalize_feature(name: str, arr: np.ndarray) -> np.ndarray:
     return np.nan_to_num(out, nan=0.0, posinf=0.0, neginf=0.0)
 
 
-def build_input_stack(day_arrays: dict, row0: int, row1: int, col0: int, col1: int) -> np.ndarray:
+def build_input_stack(day_arrays: dict, patch_features: list[str], row0: int, row1: int, col0: int, col1: int) -> np.ndarray:
     channels = []
-    for name in PATCH_FEATURES:
+    for name in patch_features:
         channels.append(normalize_feature(name, day_arrays[name][row0:row1, col0:col1]))
 
     aspect = day_arrays["aspect_deg"][row0:row1, col0:col1].astype(np.float32)
@@ -87,9 +88,10 @@ def build_input_stack(day_arrays: dict, row0: int, row1: int, col0: int, col1: i
 
 
 class PatchDataset(Dataset):
-    def __init__(self, index_csv: Path, split: str, cache_size: int = 4):
+    def __init__(self, index_csv: Path, split: str, patch_features: list[str], cache_size: int = 4):
         self.df = pd.read_csv(index_csv, encoding="utf-8")
         self.df = self.df[self.df["split"] == split].reset_index(drop=True)
+        self.patch_features = patch_features
         self.cache_size = cache_size
         self.day_cache: OrderedDict[str, dict] = OrderedDict()
         if self.df.empty:
@@ -133,7 +135,7 @@ class PatchDataset(Dataset):
         row0, row1 = int(row["row0"]), int(row["row1"])
         col0, col1 = int(row["col0"]), int(row["col1"])
 
-        x = build_input_stack(payload["arrays"], row0, row1, col0, col1)
+        x = build_input_stack(payload["arrays"], self.patch_features, row0, row1, col0, col1)
         y = payload["label"][row0:row1, col0:col1].copy()
         mask = payload["valid"][row0:row1, col0:col1].astype(np.float32)
         y = np.where(y == payload["label_nodata"], 0.0, y).astype(np.float32)
@@ -240,13 +242,13 @@ class SRWeatherLike(nn.Module):
         return residual + self.conv3(feat)
 
 
-def build_model(architecture: str, in_channels: int) -> nn.Module:
+def build_model(architecture: str, in_channels: int, input_features: list[str], static_like_features: list[str]) -> nn.Module:
     if architecture == "srcnn_like":
         return SRCNNLike(in_channels=in_channels)
     if architecture == "se_srcnn":
         return SESRCNN(in_channels=in_channels)
     if architecture == "sr_weather_like":
-        static_indices = [INPUT_FEATURES.index(name) for name in STATIC_LIKE_FEATURES]
+        static_indices = [input_features.index(name) for name in static_like_features]
         return SRWeatherLike(in_channels=in_channels, static_indices=static_indices)
     raise ValueError(f"Unsupported architecture: {architecture}")
 
@@ -314,6 +316,7 @@ def main() -> None:
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--device", default="auto")
     parser.add_argument("--cache-size", type=int, default=4)
+    parser.add_argument("--scm-field", default="scm_bootstrap_c")
     args = parser.parse_args()
 
     patch_index = Path(args.patch_index).resolve()
@@ -321,8 +324,14 @@ def main() -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     device = choose_device(args.device)
-    train_ds = PatchDataset(patch_index, split="train", cache_size=args.cache_size)
-    test_ds = PatchDataset(patch_index, split="test", cache_size=max(2, args.cache_size // 2))
+    patch_features, input_features, static_like_features = build_feature_layout(args.scm_field)
+    train_ds = PatchDataset(patch_index, split="train", patch_features=patch_features, cache_size=args.cache_size)
+    test_ds = PatchDataset(
+        patch_index,
+        split="test",
+        patch_features=patch_features,
+        cache_size=max(2, args.cache_size // 2),
+    )
 
     train_loader = DataLoader(
         train_ds,
@@ -337,8 +346,13 @@ def main() -> None:
         num_workers=args.num_workers,
     )
 
-    in_channels = len(INPUT_FEATURES)
-    model = build_model(args.architecture, in_channels=in_channels).to(device)
+    in_channels = len(input_features)
+    model = build_model(
+        args.architecture,
+        in_channels=in_channels,
+        input_features=input_features,
+        static_like_features=static_like_features,
+    ).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     history = []
@@ -364,7 +378,8 @@ def main() -> None:
                     "model_state_dict": model.state_dict(),
                     "architecture": args.architecture,
                     "in_channels": in_channels,
-                    "patch_features": INPUT_FEATURES,
+                    "patch_features": input_features,
+                    "scm_field": args.scm_field,
                 },
                 best_path,
             )
@@ -376,6 +391,7 @@ def main() -> None:
         "epochs": args.epochs,
         "batch_size": args.batch_size,
         "lr": args.lr,
+        "scm_field": args.scm_field,
         "train_patches": len(train_ds),
         "test_patches": len(test_ds),
         "model_path": str(best_path),

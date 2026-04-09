@@ -22,6 +22,14 @@ def month_key_from_day(day: str) -> str:
     return modis_day_to_date(day).strftime("%Y-%m")
 
 
+def doy365_from_day(day: str) -> int:
+    dt = datetime.strptime(day[1:], "%Y%j")
+    doy = dt.timetuple().tm_yday
+    if dt.year % 4 == 0 and (dt.year % 100 != 0 or dt.year % 400 == 0) and dt.month > 2:
+        doy -= 1
+    return doy
+
+
 def reproject_to_target(
     source_array: np.ndarray,
     source_crs,
@@ -77,6 +85,16 @@ def main() -> None:
     parser.add_argument("--features-dir", default="25to1/data/stage1/processed/stage1_simplified_features")
     parser.add_argument("--daily-dir", default="25to1/data/stage1/interim/mod11a1_daily")
     parser.add_argument("--scm-manifest", default="25to1/data/stage1/processed/scm_bootstrap_q1_janfebtrain/manifest.json")
+    parser.add_argument(
+        "--manifest-output-key",
+        default="climatology_365",
+        help="Manifest output section to use when the SCM manifest follows the paper-like 365-day format.",
+    )
+    parser.add_argument(
+        "--scm-output-key",
+        default="scm_paperlike_c",
+        help="Field name to write into each simplified feature NPZ.",
+    )
     parser.add_argument("--start-day", default="", help="Optional resume day like A2018182.")
     parser.add_argument("--skip-existing", action="store_true")
     args = parser.parse_args()
@@ -84,9 +102,14 @@ def main() -> None:
     features_dir = Path(args.features_dir).resolve()
     daily_dir = Path(args.daily_dir).resolve()
     manifest_path = Path(args.scm_manifest).resolve()
-    entries = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if isinstance(manifest_payload, dict) and "outputs" in manifest_payload:
+        entries = manifest_payload["outputs"].get(args.manifest_output_key, [])
+    else:
+        entries = manifest_payload
     month_map = {entry["month"]: entry for entry in entries if "month" in entry}
     day_map = {entry["day"]: entry for entry in entries if "day" in entry}
+    doy_map = {int(entry["doy"]): entry for entry in entries if "doy" in entry}
 
     updated = 0
     failed = 0
@@ -104,6 +127,8 @@ def main() -> None:
         else:
             month_key = month_key_from_day(day)
             entry = month_map.get(month_key)
+            if entry is None:
+                entry = doy_map.get(doy365_from_day(day))
         if entry is None:
             print(f"SKIP {day}: no SCM map found")
             continue
@@ -112,7 +137,7 @@ def main() -> None:
         target_crs, target_transform, target_h, target_w = target_grid_from_lst(lst_day_path)
 
         with np.load(npz_path) as old:
-            if args.skip_existing and "scm_bootstrap_c" in old.files:
+            if args.skip_existing and args.scm_output_key in old.files:
                 print(f"SKIP {day}: existing scm field")
                 continue
             payload = {key: old[key].copy() for key in old.files}
@@ -132,7 +157,7 @@ def main() -> None:
                 resampling=Resampling.bilinear,
             )
 
-        payload["scm_bootstrap_c"] = scm_resampled.astype(np.float32)
+        payload[args.scm_output_key] = scm_resampled.astype(np.float32)
         try:
             save_npz_atomic(npz_path, **payload)
         except PermissionError as exc:

@@ -152,6 +152,69 @@ def save_npz(path: Path, **arrays) -> None:
     np.savez_compressed(path, **arrays)
 
 
+def static_cache_key(target_shape: tuple[int, int], target_transform) -> tuple:
+    return (
+        int(target_shape[0]),
+        int(target_shape[1]),
+        tuple(float(item) for item in target_transform),
+    )
+
+
+def build_static_layers_for_target(
+    dem_path: Path,
+    slope_path: Path,
+    aspect_path: Path,
+    imp_path: Path,
+    lc_path: Path,
+    target_shape: tuple[int, int],
+    target_crs,
+    target_transform,
+) -> dict[str, np.ndarray]:
+    return {
+        "dem_m": reproject_raster_path_to_target(
+            dem_path,
+            target_shape,
+            target_crs,
+            target_transform,
+            dst_nodata=np.nan,
+            resampling=Resampling.bilinear,
+        ).astype(np.float32),
+        "slope_deg": reproject_raster_path_to_target(
+            slope_path,
+            target_shape,
+            target_crs,
+            target_transform,
+            dst_nodata=np.nan,
+            resampling=Resampling.bilinear,
+        ).astype(np.float32),
+        "aspect_deg": reproject_raster_path_to_target(
+            aspect_path,
+            target_shape,
+            target_crs,
+            target_transform,
+            dst_nodata=np.nan,
+            resampling=Resampling.nearest,
+        ).astype(np.float32),
+        "imp_proxy": reproject_raster_path_to_target(
+            imp_path,
+            target_shape,
+            target_crs,
+            target_transform,
+            dst_nodata=np.nan,
+            resampling=Resampling.bilinear,
+        ).astype(np.float32),
+        "lc_type1_majority": reproject_raster_path_to_target(
+            lc_path,
+            target_shape,
+            target_crs,
+            target_transform,
+            dst_nodata=-9999,
+            resampling=Resampling.nearest,
+            dst_dtype=np.float32,
+        ).astype(np.int16),
+    }
+
+
 def rebuild_manifest(output_dir: Path) -> list[dict]:
     manifest = []
     for npz_path in sorted(output_dir.glob("A*.npz")):
@@ -211,6 +274,7 @@ def main() -> None:
     aspect_path = Path(args.aspect).resolve()
     imp_path = Path(args.imp).resolve()
     lc_path = Path(args.lc).resolve()
+    static_layers_cache: dict[tuple, dict[str, np.ndarray]] = {}
 
     built = 0
     for day in days:
@@ -234,6 +298,7 @@ def main() -> None:
         target_transform = target_prof["transform"]
         target_crs = target_prof["crs"]
         nodata = target_prof["nodata"]
+        target_key = static_cache_key(target_shape, target_transform)
 
         era5_item, era5_idx = era5_date_index[day_date]
         era5_day = era5_item["values"][era5_idx, :, :].astype(np.float32) - 273.15
@@ -249,47 +314,18 @@ def main() -> None:
             resampling=Resampling.bilinear,
         )
 
-        dem_resampled = reproject_raster_path_to_target(
-            dem_path,
-            target_shape,
-            target_crs,
-            target_transform,
-            dst_nodata=np.nan,
-            resampling=Resampling.bilinear,
-        )
-        slope_resampled = reproject_raster_path_to_target(
-            slope_path,
-            target_shape,
-            target_crs,
-            target_transform,
-            dst_nodata=np.nan,
-            resampling=Resampling.bilinear,
-        )
-        aspect_resampled = reproject_raster_path_to_target(
-            aspect_path,
-            target_shape,
-            target_crs,
-            target_transform,
-            dst_nodata=np.nan,
-            resampling=Resampling.nearest,
-        )
-        imp_resampled = reproject_raster_path_to_target(
-            imp_path,
-            target_shape,
-            target_crs,
-            target_transform,
-            dst_nodata=np.nan,
-            resampling=Resampling.bilinear,
-        )
-        lc_resampled = reproject_raster_path_to_target(
-            lc_path,
-            target_shape,
-            target_crs,
-            target_transform,
-            dst_nodata=-9999,
-            resampling=Resampling.nearest,
-            dst_dtype=np.float32,
-        ).astype(np.int16)
+        if target_key not in static_layers_cache:
+            static_layers_cache[target_key] = build_static_layers_for_target(
+                dem_path=dem_path,
+                slope_path=slope_path,
+                aspect_path=aspect_path,
+                imp_path=imp_path,
+                lc_path=lc_path,
+                target_shape=target_shape,
+                target_crs=target_crs,
+                target_transform=target_transform,
+            )
+        static_layers = static_layers_cache[target_key]
 
         lst_day = np.where(lst_day == nodata, np.nan, lst_day.astype(np.float32))
         lst_night = np.where(lst_night == nodata, np.nan, lst_night.astype(np.float32))
@@ -306,11 +342,11 @@ def main() -> None:
         save_npz(
             npz_path,
             era5_t2m_c=era5_resampled.astype(np.float32),
-            dem_m=dem_resampled.astype(np.float32),
-            slope_deg=slope_resampled.astype(np.float32),
-            aspect_deg=aspect_resampled.astype(np.float32),
-            imp_proxy=imp_resampled.astype(np.float32),
-            lc_type1_majority=lc_resampled,
+            dem_m=static_layers["dem_m"],
+            slope_deg=static_layers["slope_deg"],
+            aspect_deg=static_layers["aspect_deg"],
+            imp_proxy=static_layers["imp_proxy"],
+            lc_type1_majority=static_layers["lc_type1_majority"],
             lst_day_c=lst_day.astype(np.float32),
             lst_night_c=lst_night.astype(np.float32),
             lst_mean_c=lst_mean.astype(np.float32),
