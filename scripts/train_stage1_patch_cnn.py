@@ -463,6 +463,75 @@ class SwinIRLight(nn.Module):
         return residual + self.tail(feat)
 
 
+class ConvAttentionBranch(nn.Module):
+    def __init__(self, channels: int, compress_ratio: int = 4, squeeze_factor: int = 16):
+        super().__init__()
+        hidden = max(channels // compress_ratio, 8)
+        self.net = nn.Sequential(
+            nn.Conv2d(channels, hidden, kernel_size=3, padding=1),
+            nn.GELU(),
+            nn.Conv2d(hidden, channels, kernel_size=3, padding=1),
+            ChannelAttention(channels, reduction=squeeze_factor),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.net(x)
+
+
+class HATBlock(nn.Module):
+    def __init__(self, dim: int, num_heads: int, window_size: int = 8, shift_size: int = 0):
+        super().__init__()
+        self.dim = dim
+        self.window_size = window_size
+        self.shift_size = shift_size
+        self.norm1 = nn.LayerNorm(dim)
+        self.attn = WindowAttention(dim, num_heads)
+        self.conv_branch = ConvAttentionBranch(dim)
+        self.norm2 = nn.LayerNorm(dim)
+        self.mlp = Mlp(dim, mlp_ratio=2.0)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        b, c, h, w = x.shape
+        if h % self.window_size != 0 or w % self.window_size != 0:
+            raise ValueError(f"HATTiny expects height/width divisible by window_size={self.window_size}, got {(h, w)}")
+
+        x_hw = x.permute(0, 2, 3, 1).contiguous()
+        shortcut = x_hw
+        x_norm = self.norm1(x_hw)
+        if self.shift_size > 0:
+            x_norm = torch.roll(x_norm, shifts=(-self.shift_size, -self.shift_size), dims=(1, 2))
+        windows = window_partition(x_norm, self.window_size)
+        attn_windows = self.attn(windows)
+        x_attn = window_reverse(attn_windows, self.window_size, h, w, b)
+        if self.shift_size > 0:
+            x_attn = torch.roll(x_attn, shifts=(self.shift_size, self.shift_size), dims=(1, 2))
+
+        conv_feat = self.conv_branch(x).permute(0, 2, 3, 1).contiguous()
+        x_hw = shortcut + 0.5 * x_attn + 0.5 * conv_feat
+        x_hw = x_hw + self.mlp(self.norm2(x_hw))
+        return x_hw.permute(0, 3, 1, 2).contiguous()
+
+
+class HATTiny(nn.Module):
+    def __init__(self, in_channels: int, embed_dim: int = 48, num_heads: int = 4, num_blocks: int = 4, window_size: int = 8):
+        super().__init__()
+        self.head = nn.Conv2d(in_channels, embed_dim, kernel_size=3, padding=1)
+        blocks = []
+        for idx in range(num_blocks):
+            shift_size = 0 if idx % 2 == 0 else window_size // 2
+            blocks.append(HATBlock(embed_dim, num_heads=num_heads, window_size=window_size, shift_size=shift_size))
+        self.blocks = nn.Sequential(*blocks)
+        self.body_conv = nn.Conv2d(embed_dim, embed_dim, kernel_size=3, padding=1)
+        self.tail = nn.Conv2d(embed_dim, 1, kernel_size=3, padding=1)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        residual = x[:, 0:1, :, :] * 20.0
+        feat = self.head(x)
+        body = self.body_conv(self.blocks(feat))
+        feat = feat + body
+        return residual + self.tail(feat)
+
+
 def build_model(architecture: str, in_channels: int, input_features: list[str], static_like_features: list[str]) -> nn.Module:
     if architecture == "srcnn_like":
         return SRCNNLike(in_channels=in_channels)
@@ -476,6 +545,8 @@ def build_model(architecture: str, in_channels: int, input_features: list[str], 
         return RCANLike(in_channels=in_channels)
     if architecture == "swinir_light":
         return SwinIRLight(in_channels=in_channels)
+    if architecture == "hat_tiny":
+        return HATTiny(in_channels=in_channels)
     if architecture == "sr_weather_like":
         static_indices = [input_features.index(name) for name in static_like_features]
         return SRWeatherLike(in_channels=in_channels, static_indices=static_indices)
@@ -536,7 +607,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--architecture",
-        choices=["srcnn_like", "se_srcnn", "resunet_like", "edsr_like", "rcan_like", "swinir_light", "sr_weather_like"],
+        choices=["srcnn_like", "se_srcnn", "resunet_like", "edsr_like", "rcan_like", "swinir_light", "hat_tiny", "sr_weather_like"],
         default="srcnn_like",
     )
     parser.add_argument("--epochs", type=int, default=3)

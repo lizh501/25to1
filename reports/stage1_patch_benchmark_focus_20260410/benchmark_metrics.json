@@ -1,0 +1,84 @@
+{
+  "benchmark_name": "Focused patch benchmark after model expansion",
+  "report_dir": "E:\\18664-C5F119\\华为家庭存储\\CUBD\\Research\\HXGG2025-6-2\\hxgg2025-6-2\\25to1\\reports\\stage1_patch_benchmark_focus_20260410",
+  "rows": [
+    {
+      "name": "srcnn_like",
+      "path": "E:\\18664-C5F119\\华为家庭存储\\CUBD\\Research\\HXGG2025-6-2\\hxgg2025-6-2\\25to1\\data\\stage1\\models\\stage1_patch_cnn_scmpaperlike_2018_2019train_2020test_daily5_ps64_s64_v50_ordered\\training_summary.json",
+      "epochs": 2,
+      "batch_size": 64,
+      "lr": 0.001,
+      "best_epoch": 2,
+      "test_mae": 6.038392066955566,
+      "test_rmse": 7.407072067260742,
+      "rmse_improvement_vs_srcnn_pct": 0.0
+    },
+    {
+      "name": "sr_weather_like",
+      "path": "E:\\18664-C5F119\\华为家庭存储\\CUBD\\Research\\HXGG2025-6-2\\hxgg2025-6-2\\25to1\\data\\stage1\\models\\stage1_patch_sr_weather_like_scmpaperlike_2018_2019train_2020test_daily5_ps64_s64_v50_ordered\\training_summary.json",
+      "epochs": 2,
+      "batch_size": 64,
+      "lr": 0.001,
+      "best_epoch": 1,
+      "test_mae": 6.037985324859619,
+      "test_rmse": 7.406463623046875,
+      "rmse_improvement_vs_srcnn_pct": 0.008214368759236337
+    },
+    {
+      "name": "edsr_like",
+      "path": "E:\\18664-C5F119\\华为家庭存储\\CUBD\\Research\\HXGG2025-6-2\\hxgg2025-6-2\\25to1\\data\\stage1\\models\\stage1_patch_edsr_like_scmpaperlike_2018_2019train_2020test_daily5_ps64_s64_v50\\training_summary.json",
+      "epochs": 2,
+      "batch_size": 32,
+      "lr": 0.0005,
+      "best_epoch": 2,
+      "test_mae": 4.811583042144775,
+      "test_rmse": 5.995177745819092,
+      "rmse_improvement_vs_srcnn_pct": 19.061436268214848
+    },
+    {
+      "name": "rcan_like",
+      "path": "E:\\18664-C5F119\\华为家庭存储\\CUBD\\Research\\HXGG2025-6-2\\hxgg2025-6-2\\25to1\\data\\stage1\\models\\stage1_patch_rcan_like_scmpaperlike_2018_2019train_2020test_daily5_ps64_s64_v50\\training_summary.json",
+      "epochs": 2,
+      "batch_size": 32,
+      "lr": 0.0005,
+      "best_epoch": 2,
+      "test_mae": 5.264790058135986,
+      "test_rmse": 6.480973243713379,
+      "rmse_improvement_vs_srcnn_pct": 12.502900135678713
+    },
+    {
+      "name": "resunet_like_e4",
+      "path": "E:\\18664-C5F119\\华为家庭存储\\CUBD\\Research\\HXGG2025-6-2\\hxgg2025-6-2\\25to1\\data\\stage1\\models\\stage1_patch_resunet_like_scmpaperlike_2018_2019train_2020test_daily5_ps64_s64_v50_e4\\training_summary.json",
+      "epochs": 4,
+      "batch_size": 16,
+      "lr": 0.0002,
+      "best_epoch": 4,
+      "test_mae": 1.2781444787979126,
+      "test_rmse": 2.319082021713257,
+      "rmse_improvement_vs_srcnn_pct": 68.69097531852567
+    },
+    {
+      "name": "swinir_light_e4",
+      "path": "E:\\18664-C5F119\\华为家庭存储\\CUBD\\Research\\HXGG2025-6-2\\hxgg2025-6-2\\25to1\\data\\stage1\\models\\stage1_patch_swinir_light_scmpaperlike_2018_2019train_2020test_daily5_ps64_s64_v50_e4\\training_summary.json",
+      "epochs": 4,
+      "batch_size": 16,
+      "lr": 0.0002,
+      "best_epoch": 4,
+      "test_mae": 3.091130256652832,
+      "test_rmse": 4.241827487945557,
+      "rmse_improvement_vs_srcnn_pct": 42.73273637103608
+    },
+    {
+      "name": "hat_tiny_e4",
+      "path": "E:\\18664-C5F119\\华为家庭存储\\CUBD\\Research\\HXGG2025-6-2\\hxgg2025-6-2\\25to1\\data\\stage1\\models\\stage1_patch_hat_tiny_scmpaperlike_2018_2019train_2020test_daily5_ps64_s64_v50_e4\\training_summary.json",
+      "epochs": 4,
+      "batch_size": 16,
+      "lr": 0.0002,
+      "best_epoch": 4,
+      "test_mae": 2.4005119800567627,
+      "test_rmse": 3.5206100940704346,
+      "rmse_improvement_vs_srcnn_pct": 52.46961198566529
+    }
+  ],
+  "figure": "E:\\18664-C5F119\\华为家庭存储\\CUBD\\Research\\HXGG2025-6-2\\hxgg2025-6-2\\25to1\\reports\\stage1_patch_benchmark_focus_20260410\\figures\\patch_benchmark_focus_20260410.png"
+}
