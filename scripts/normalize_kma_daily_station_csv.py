@@ -86,14 +86,26 @@ def normalize_csv(input_path: Path, output_dir: Path) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Normalize downloaded KMA daily station CSV files into UTF-8 core tables.")
-    parser.add_argument("--input", nargs="+", required=True, help="One or more KMA daily CSV files.")
+    parser.add_argument("--input", nargs="*", default=[], help="One or more KMA daily CSV files.")
+    parser.add_argument(
+        "--input-dir",
+        nargs="*",
+        default=[],
+        help="One or more directories to scan recursively for CSV files.",
+    )
     parser.add_argument("--output-dir", default="25to1/data/stage1/processed/stations")
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir).resolve()
+    inputs = [Path(item).resolve() for item in args.input]
+    for item in args.input_dir:
+        inputs.extend(sorted(Path(item).resolve().rglob("*.csv")))
+    inputs = sorted({path for path in inputs if path.suffix.lower() == ".csv"})
+    if not inputs:
+        raise RuntimeError("No input CSV files were provided.")
+
     manifest = []
-    for item in args.input:
-        input_path = Path(item).resolve()
+    for input_path in inputs:
         meta = normalize_csv(input_path, output_dir)
         manifest.append(meta)
         print(f"NORMALIZED {input_path.name}: rows={meta['rows']} -> {meta['output_csv']}")

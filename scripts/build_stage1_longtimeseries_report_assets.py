@@ -1,4 +1,5 @@
 import json
+import argparse
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -9,7 +10,7 @@ def load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def build_scm_plot(manifest: dict, output_path: Path) -> dict:
+def build_scm_plot(manifest: dict, output_path: Path, title: str) -> dict:
     climatology = manifest["outputs"]["climatology_365"]
     anomaly = manifest["outputs"].get("anomaly_standardized_365", [])
 
@@ -22,7 +23,7 @@ def build_scm_plot(manifest: dict, output_path: Path) -> dict:
     axes[0].plot(doys, clim_mean, color="#1b6ca8", linewidth=2.0, label="SCM climatology mean")
     axes[0].fill_between(doys, clim_min, clim_max, color="#8ecae6", alpha=0.35, label="Daily min-max envelope")
     axes[0].set_ylabel("Temperature (C)")
-    axes[0].set_title("Stage-1 Paper-like SCM Climatology (2018-2019)")
+    axes[0].set_title(title)
     axes[0].grid(alpha=0.25)
     axes[0].legend(loc="upper left")
 
@@ -38,7 +39,7 @@ def build_scm_plot(manifest: dict, output_path: Path) -> dict:
         axes[1].plot(doys, clipped_mean, color="#c1121f", linewidth=1.8, label="Anomaly mean (clipped to [-20, 20])")
         axes[1].bar(doys, valid_counts, color="#f4a261", alpha=0.5, label="Valid pixels")
         axes[1].set_ylabel("Anomaly / valid count")
-        axes[1].set_title("Anomaly-standardized SCM is numerically unstable in parts of 2018-2019")
+        axes[1].set_title("Anomaly-standardized SCM remains numerically unstable on part of the annual cycle")
         axes[1].grid(alpha=0.25)
         axes[1].legend(loc="upper left")
 
@@ -65,17 +66,30 @@ def build_scm_plot(manifest: dict, output_path: Path) -> dict:
     }
 
 
-def build_station_plot(diagnostics: dict, output_path: Path) -> None:
-    labels = ["Same-day LST", "Four-observation LST", "Linear regression"]
+def read_station_metric(payload: dict, key: str, metric: str) -> float:
+    if "baselines" in payload:
+        return payload["baselines"][key][metric]
+    mapping = {
+        "linear_regression": "linear_regression_full_train_validate",
+        "random_forest": "random_forest_full_train_validate",
+    }
+    lookup = mapping.get(key, key)
+    return payload[lookup][metric]
+
+
+def build_station_plot(diagnostics: dict, output_path: Path, title: str) -> None:
+    labels = ["Same-day LST", "Four-observation LST", "Linear regression", "Random forest"]
     rmse = [
-        diagnostics["same_day_lst_mean"]["rmse"],
-        diagnostics["four_obs_lst_mean"]["rmse"],
-        diagnostics["linear_regression_full_train_validate"]["rmse"],
+        read_station_metric(diagnostics, "same_day_lst_mean", "rmse"),
+        read_station_metric(diagnostics, "four_obs_lst_mean", "rmse"),
+        read_station_metric(diagnostics, "linear_regression", "rmse"),
+        read_station_metric(diagnostics, "random_forest", "rmse"),
     ]
     mae = [
-        diagnostics["same_day_lst_mean"]["mae"],
-        diagnostics["four_obs_lst_mean"]["mae"],
-        diagnostics["linear_regression_full_train_validate"]["mae"],
+        read_station_metric(diagnostics, "same_day_lst_mean", "mae"),
+        read_station_metric(diagnostics, "four_obs_lst_mean", "mae"),
+        read_station_metric(diagnostics, "linear_regression", "mae"),
+        read_station_metric(diagnostics, "random_forest", "mae"),
     ]
 
     x = np.arange(len(labels))
@@ -86,7 +100,7 @@ def build_station_plot(diagnostics: dict, output_path: Path) -> None:
     ax.set_xticks(x)
     ax.set_xticklabels(labels)
     ax.set_ylabel("Error (C)")
-    ax.set_title("2018-2019 Stage-1 Paper-like Station-model Diagnostics")
+    ax.set_title(title)
     ax.grid(axis="y", alpha=0.25)
     ax.legend()
     fig.tight_layout()
@@ -95,7 +109,7 @@ def build_station_plot(diagnostics: dict, output_path: Path) -> None:
     plt.close(fig)
 
 
-def build_patch_plot(srcnn_summary: dict, srw_summary: dict, output_path: Path) -> None:
+def build_patch_plot(srcnn_summary: dict, srw_summary: dict, output_path: Path, title: str) -> None:
     labels = ["SRCNN-like", "SR-Weather-like"]
     rmse = [
         srcnn_summary["history"][-1]["test"]["rmse"],
@@ -113,7 +127,7 @@ def build_patch_plot(srcnn_summary: dict, srw_summary: dict, output_path: Path) 
     ax.set_xticks(x)
     ax.set_xticklabels(labels)
     ax.set_ylabel("Patch error (C)")
-    ax.set_title("2018 train -> 2019 test quick-run patch comparison")
+    ax.set_title(title)
     ax.grid(axis="y", alpha=0.25)
     ax.legend()
     fig.tight_layout()
@@ -123,26 +137,43 @@ def build_patch_plot(srcnn_summary: dict, srw_summary: dict, output_path: Path) 
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Build figure assets for Stage-1 long-timeseries reports.")
+    parser.add_argument("--report-subdir", default="stage1_longtimeseries_2018_2019")
+    parser.add_argument("--scm-manifest", required=True)
+    parser.add_argument("--station-diagnostics", required=True)
+    parser.add_argument("--srcnn-summary", required=True)
+    parser.add_argument("--srw-summary", required=True)
+    parser.add_argument("--scm-title", default="Stage-1 Paper-like SCM Climatology")
+    parser.add_argument("--station-title", default="Stage-1 Paper-like Station-model Diagnostics")
+    parser.add_argument("--patch-title", default="Patch-model quick-run comparison")
+    parser.add_argument("--scm-figure-name", default="scm_climatology_cycle.png")
+    parser.add_argument("--station-figure-name", default="station_model_compare.png")
+    parser.add_argument("--patch-figure-name", default="patch_model_compare.png")
+    args = parser.parse_args()
+
     root = Path("25to1").resolve()
-    report_dir = root / "reports" / "stage1_longtimeseries_2018_2019"
+    report_dir = root / "reports" / args.report_subdir
     figure_dir = report_dir / "figures"
     figure_dir.mkdir(parents=True, exist_ok=True)
 
-    scm_manifest = load_json(root / "data" / "stage1" / "processed" / "scm_paperlike_linear_clip_2018_2019full" / "manifest.json")
-    station_diag = load_json(root / "data" / "stage1" / "models" / "modis_at_paperlike_asos64_aws_chunk420_2018_2019full" / "training_diagnostics_rerun.json")
-    srcnn_summary = load_json(root / "data" / "stage1" / "models" / "stage1_patch_cnn_scmpaperlike_2018train_2019test_daily5_ps64_s64_v50" / "training_summary.json")
-    srw_summary = load_json(root / "data" / "stage1" / "models" / "stage1_patch_sr_weather_like_scmpaperlike_2018train_2019test_daily5_ps64_s64_v50" / "training_summary.json")
+    scm_manifest = load_json(Path(args.scm_manifest).resolve())
+    station_diag = load_json(Path(args.station_diagnostics).resolve())
+    srcnn_summary = load_json(Path(args.srcnn_summary).resolve())
+    srw_summary = load_json(Path(args.srw_summary).resolve())
 
-    scm_stats = build_scm_plot(scm_manifest, figure_dir / "scm_climatology_cycle_2018_2019.png")
-    build_station_plot(station_diag, figure_dir / "station_model_compare_2018_2019.png")
-    build_patch_plot(srcnn_summary, srw_summary, figure_dir / "patch_model_compare_2018_2019.png")
+    scm_output = figure_dir / args.scm_figure_name
+    station_output = figure_dir / args.station_figure_name
+    patch_output = figure_dir / args.patch_figure_name
+    scm_stats = build_scm_plot(scm_manifest, scm_output, args.scm_title)
+    build_station_plot(station_diag, station_output, args.station_title)
+    build_patch_plot(srcnn_summary, srw_summary, patch_output, args.patch_title)
 
     summary = {
         "report_dir": str(report_dir),
         "figures": {
-            "scm_cycle": str((figure_dir / "scm_climatology_cycle_2018_2019.png").resolve()),
-            "station_model_compare": str((figure_dir / "station_model_compare_2018_2019.png").resolve()),
-            "patch_model_compare": str((figure_dir / "patch_model_compare_2018_2019.png").resolve()),
+            "scm_cycle": str(scm_output.resolve()),
+            "station_model_compare": str(station_output.resolve()),
+            "patch_model_compare": str(patch_output.resolve()),
         },
         "scm_stats": scm_stats,
     }

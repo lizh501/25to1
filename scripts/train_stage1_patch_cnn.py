@@ -53,7 +53,7 @@ def masked_metrics(pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor)
 
 def normalize_feature(name: str, arr: np.ndarray) -> np.ndarray:
     out = arr.astype(np.float32, copy=True)
-    if name in {"era5_t2m_c", "lst_day_c", "lst_night_c", "lst_mean_c", "scm_bootstrap_c", "scm_paperlike_c"}:
+    if name in {"era5_t2m_c", "lst_day_c", "lst_night_c", "lst_mean_c"} or name.startswith("scm_"):
         out = np.clip(out, -40.0, 50.0) / 20.0
     elif name == "dem_m":
         out[out <= -10000.0] = np.nan
@@ -317,6 +317,7 @@ def main() -> None:
     parser.add_argument("--device", default="auto")
     parser.add_argument("--cache-size", type=int, default=4)
     parser.add_argument("--scm-field", default="scm_bootstrap_c")
+    parser.add_argument("--no-train-shuffle", action="store_true")
     args = parser.parse_args()
 
     patch_index = Path(args.patch_index).resolve()
@@ -336,7 +337,7 @@ def main() -> None:
     train_loader = DataLoader(
         train_ds,
         batch_size=args.batch_size,
-        shuffle=True,
+        shuffle=not args.no_train_shuffle,
         num_workers=args.num_workers,
     )
     test_loader = DataLoader(
@@ -392,6 +393,7 @@ def main() -> None:
         "batch_size": args.batch_size,
         "lr": args.lr,
         "scm_field": args.scm_field,
+        "train_shuffle": not args.no_train_shuffle,
         "train_patches": len(train_ds),
         "test_patches": len(test_ds),
         "model_path": str(best_path),

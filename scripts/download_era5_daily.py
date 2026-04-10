@@ -104,15 +104,17 @@ def main() -> None:
         f"era5_daily_{args.variable.replace('-', '_')}",
     )
     label = defaults.get("label", f"ERA5 {daily_statistic} {args.variable}")
+    suffix = f"_{args.months.replace(',', '-')}" if args.months else ""
+    default_filename = f"{output_stem}_{args.year:04d}{suffix}.nc"
     output_path = Path(args.output).resolve() if args.output else None
     if output_path is None:
         workspace_root = config_path.parents[2]
-        suffix = f"_{args.months.replace(',', '-')}" if args.months else ""
-        output_path = (
-            workspace_root
-            / cfg["paths"][output_dir_key]
-            / f"{output_stem}_{args.year:04d}{suffix}.nc"
-        )
+        output_path = workspace_root / cfg["paths"][output_dir_key] / default_filename
+    elif output_path.exists() and output_path.is_dir():
+        output_path = output_path / default_filename
+    elif output_path.suffix.lower() != ".nc":
+        output_path.mkdir(parents=True, exist_ok=True)
+        output_path = output_path / default_filename
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     request = build_request(
